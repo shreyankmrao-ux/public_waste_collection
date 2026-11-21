@@ -294,15 +294,25 @@ def login():
         user = conn.execute("""
             SELECT *
             FROM users
-            WHERE email = ? AND password = ?
+            WHERE email = ?
         """, (
             email,
-            password
         )).fetchone()
 
         conn.close()
 
+        password_matches = False
         if user:
+            stored_password = user["password"]
+            if stored_password.startswith(("scrypt:", "pbkdf2:")):
+                password_matches = check_password_hash(
+                    stored_password,
+                    password
+                )
+            else:
+                password_matches = stored_password == password
+
+        if user and password_matches:
 
             session["user_id"] = user["id"]
             session["name"] = user["name"]
@@ -351,39 +361,7 @@ def logout():
 
 @app.route("/area_admin_login", methods=["GET", "POST"])
 def area_admin_login():
-
-    if request.method == "POST":
-
-        email = request.form.get("email", "").strip()
-        password = request.form.get("password", "")
-
-        conn = get_db()
-
-        user = conn.execute("""
-            SELECT *
-            FROM users
-            WHERE email = ? AND role = 'area_admin'
-        """, (
-            email,
-        )).fetchone()
-
-        conn.close()
-
-        if (
-            user
-            and user["password"].startswith(("scrypt:", "pbkdf2:"))
-            and check_password_hash(user["password"], password)
-        ):
-
-            session["user_id"] = user["id"]
-            session["name"] = user["name"]
-            session["role"] = user["role"]
-
-            return redirect(url_for("area_admin_dashboard"))
-
-        flash("Invalid Area Administrator email or password.")
-
-    return render_template("area_admin_login.html")
+    return redirect(url_for("login"))
 
 
 # =========================================================
@@ -542,7 +520,7 @@ def is_approved_pincode(pincode):
 def area_admin_required():
 
     if session.get("role") != "area_admin":
-        return redirect(url_for("area_admin_login"))
+        return redirect(url_for("login"))
 
     return None
 
