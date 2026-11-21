@@ -1,0 +1,229 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citizen Dashboard | CleanCity</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: #f1f8f2;
+            color: #26382d;
+        }
+
+        /* Top navigation */
+        .citizen-nav {
+            width: 100%;
+            min-height: 75px;
+            padding: 15px 30px;
+            background: #103d2b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .citizen-nav-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .logout-button {
+            display: inline-block;
+            padding: 13px 28px;
+            background: #d6c28a;
+            color: #103d2b;
+            border: 2px solid #d6c28a;
+            border-radius: 9px;
+            font-size: 17px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .logout-button:hover {
+            background: #f1e4bd;
+        }
+
+        /* Center the entire dashboard */
+        .citizen-main {
+            width: 100%;
+            min-height: calc(100vh - 75px);
+            padding: 40px 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .citizen-main h1 {
+            margin: 0 0 20px;
+            color: #14532d;
+            font-size: 40px;
+            text-align: center;
+        }
+
+        .citizen-intro {
+            max-width: 720px;
+            margin: 0 auto 35px;
+            font-size: 20px;
+            line-height: 1.8;
+            text-align: center;
+        }
+
+        /* Dashboard cards */
+        .dashboard-cards {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 30px;
+        }
+
+        .dashboard-card {
+            min-height: 280px;
+            padding: 35px 25px;
+            background: #ffffff;
+            border: 1px solid #dce9de;
+            border-radius: 16px;
+            box-shadow: 0 8px 25px rgba(16, 61, 43, 0.10);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .dashboard-card h2 {
+            margin: 0 0 18px;
+            color: #14532d;
+            font-size: 27px;
+            text-align: center;
+        }
+
+        .dashboard-card p {
+            margin: 0 0 25px;
+            font-size: 18px;
+            line-height: 1.7;
+            text-align: center;
+        }
+
+        /* Large boxed action buttons */
+        .dashboard-card .button {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            min-width: 220px;
+            padding: 16px 25px;
+            background: #14532d;
+            color: #ffffff;
+            border: 2px solid #14532d;
+            border-radius: 9px;
+            font-size: 19px;
+            font-weight: bold;
+            text-decoration: none;
+            text-align: center;
+            transition: 0.2s ease;
+        }
+
+        .dashboard-card .button:hover {
+            background: #d6c28a;
+            border-color: #d6c28a;
+            color: #103d2b;
+        }
+
+        /* Mobile layout */
+        @media (max-width: 700px) {
+            .citizen-main {
+                padding: 30px 18px;
+            }
+
+            .citizen-main h1 {
+                font-size: 31px;
+            }
+
+            .citizen-intro {
+                font-size: 17px;
+            }
+
+            .dashboard-cards {
+                grid-template-columns: 1fr;
+                max-width: 450px;
+            }
+
+            .dashboard-card {
+                min-height: 250px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="citizen-nav">
+        <div class="citizen-nav-links">
+            <a href="{{ url_for('logout') }}"
+               class="logout-button">Sign Out</a>
+        </div>
+    </nav>
+
+    <main class="citizen-main">
+
+        <h1>Welcome, {{ name }}!</h1>
+
+        <p class="citizen-intro">
+            Help keep your community clean by reporting waste
+            and tracking collection progress.
+        </p>
+
+        <div class="dashboard-cards">
+
+            <section class="dashboard-card">
+                <h2>📢 Report Waste</h2>
+
+                <p>
+                    Report uncollected waste in your area
+                    and help collection teams take action.
+                </p>
+
+                <a class="button"
+                   href="{{ url_for('report') }}">
+                    Report Now →
+                </a>
+            </section>
+
+            <section class="dashboard-card">
+                <h2>📊 My Reports</h2>
+
+                <p>
+                    View your submitted reports and check
+                    their current collection status.
+                </p>
+
+                <a class="button"
+                   href="{{ url_for('my_reports') }}">
+                    View Reports →
+                </a>
+            </section>
+
+        </div>
+
+    </main>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
+```

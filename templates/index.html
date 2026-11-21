@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Report uncollected waste and monitor collection progress in your community.">
+    <title>CleanCity | Waste Collection Monitoring</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <header class="site-header">
+        <a href="{{ url_for('index') }}" class="brand">
+            <span class="brand-icon">♻</span>
+            <span>
+                CleanCity
+                <small>WASTE MANAGEMENT PORTAL</small>
+            </span>
+        </a>
+
+        
+<nav class="nav-links" aria-label="Main navigation">
+    <a href="{{ url_for('index') }}">Home</a>
+    <a href="#features">Features</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="{{ url_for('login') }}" class="nav-login">Sign In</a>
+    <a href="{{ url_for('area_admin_login') }}" class="nav-login">Area Admin</a>
+    <a href="{{ url_for('register') }}" class="nav-cta">Create Account <span>→</span></a>
+</nav>
+
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero-content">
+                <span class="eyebrow">A SMARTER WAY TO KEEP CITIES CLEAN</span>
+
+                <h1>A Cleaner City<br>Starts With You.</h1>
+
+                <p>
+                    Report uncollected waste, track collection progress,
+                    and work together to build a cleaner, healthier community.
+                </p>
+
+                <div class="hero-actions">
+                    <a class="btn" href="{{ url_for('report') }}">Report Waste →</a>
+                    <a class="btn btn-outline" href="#how-it-works">Learn More</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <article class="feature">
+                <div class="feature-icon">♻</div>
+                <h3>Report Waste</h3>
+                <p>Submit waste reports with a location, description, and photo.</p>
+            </article>
+
+            <article class="feature">
+                <div class="feature-icon">🚛</div>
+                <h3>Track Progress</h3>
+                <p>Follow your report as it moves from pending to completed.</p>
+            </article>
+
+            <article class="feature">
+                <div class="feature-icon">🌱</div>
+                <h3>Build Community</h3>
+                <p>Help collection teams identify problems and keep areas cleaner.</p>
+            </article>
+        </section>
+
+        <section class="section" id="how-it-works">
+            <h2>Cleaner Communities, Made Simple</h2>
+            <p class="section-intro">
+                A straightforward process connects citizens with waste collection teams.
+            </p>
+
+            <div class="steps-grid">
+                <article class="step-card">
+                    <div class="step-number">01</div>
+                    <h3>Submit a Report</h3>
+                    <p>Sign in and share the location, details, and an optional photo of the waste.</p>
+                </article>
+
+                <article class="step-card">
+                    <div class="step-number">02</div>
+                    <h3>Collection Is Assigned</h3>
+                    <p>Administrators review reports and assign collection personnel to the issue.</p>
+                </article>
+
+                <article class="step-card">
+                    <div class="step-number">03</div>
+                    <h3>Track Completion</h3>
+                    <p>Check your reports to see when collection personnel update their status.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="cta-section">
+            <h2>Let's Make Our City Cleaner</h2>
+            <p>Your report can help your community take action.</p>
+            <a class="btn" href="{{ url_for('register') }}">Join the Community →</a>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>© 2026 CleanCity · Public Waste Collection Monitoring System</p>
+        <p>Working together for a cleaner tomorrow.</p>
+    </footer>
+
+</body>
+</html>

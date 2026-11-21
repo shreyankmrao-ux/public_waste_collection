@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% if pincode_validated %}Report waste{% else %}Check your area{% endif %} | CleanCity</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="{{ url_for('dashboard') }}">♻ CleanCity</a>
+        <nav><a href="{{ url_for('logout') }}">Sign out</a></nav>
+    </header>
+
+    <main class="form-card">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="message {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        {% if pincode_validated %}
+            <h1>Report waste</h1>
+            <p>Share a location and description so the collection team can respond.</p>
+            <form method="post" enctype="multipart/form-data">
+                <input type="hidden" name="pincode" value="{{ pincode }}">
+                <label for="location">Location</label>
+                <input id="location" name="location" placeholder="Street, landmark, or area" required>
+                <label for="description">What needs collecting?</label>
+                <textarea id="description" name="description" placeholder="Describe the waste and nearby details" required></textarea>
+                <label for="photo">Photo (optional)</label>
+                <input id="photo" name="photo" type="file" accept="image/*">
+                <button class="button" type="submit">Submit report →</button>
+            </form>
+        {% else %}
+            <h1>Check your area</h1>
+            <p>Enter your six-digit pincode to check whether waste collection reporting is available in your area.</p>
+            <form method="post">
+                <input type="hidden" name="action" value="validate_pincode">
+                <label for="pincode">Six-digit pincode</label>
+                <input id="pincode" name="pincode" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="postal-code" required>
+                <button class="button" type="submit">Check Pincode →</button>
+            </form>
+        {% endif %}
+    </main>
+</body>
+</html>

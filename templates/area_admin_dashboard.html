@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Area Administrator Dashboard | CleanCity</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="{{ url_for('area_admin_dashboard') }}">♻ CleanCity · Area Administration</a>
+        <nav><a href="{{ url_for('logout') }}">Sign out</a></nav>
+    </header>
+
+    <main class="content">
+        <span class="eyebrow">LOCATION COVERAGE</span>
+        <h1>Area Administrator Dashboard</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="message {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        <section class="panel">
+            <h2>Add New Pincode</h2>
+            <form method="post" action="{{ url_for('add_ward_pincode') }}">
+                <label for="pincode">Pincode</label>
+                <input id="pincode" name="pincode" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
+
+                <label for="city">City</label>
+                <input id="city" name="city" type="text" maxlength="100" required>
+
+                <label for="ward_name">Ward Name</label>
+                <input id="ward_name" name="ward_name" type="text" maxlength="100" required>
+
+                <button type="submit">Add Pincode</button>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2>Approved Pincodes</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pincode</th>
+                            <th>City</th>
+                            <th>Ward Name</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in pincodes %}
+                            <tr>
+                                <td>{{ item.pincode }}</td>
+                                <td>{{ item.city }}</td>
+                                <td>{{ item.ward_name }}</td>
+                                <td>
+                                    <form class="inline-form" method="post" action="{{ url_for('delete_ward_pincode', pincode_id=item.id) }}">
+                                        <button class="danger-button" type="submit">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4">No approved pincodes have been added yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

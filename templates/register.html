@@ -1,0 +1,175 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account | CleanCity</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        .auth-page {
+            width: 100%;
+            min-height: 100vh;
+            padding: 40px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            background: #f1f8f2;
+            font-family: 'DM Sans', Arial, sans-serif;
+        }
+
+        .auth-page .container.small {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 36px;
+            box-sizing: border-box;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 12px 35px rgba(16, 61, 43, 0.12);
+        }
+
+        .auth-page h2 {
+            margin-bottom: 24px;
+            color: #14532d;
+            text-align: center;
+            font-family: 'Manrope', sans-serif;
+            font-size: 30px;
+        }
+
+        .auth-page label {
+            display: block;
+            margin: 14px 0 8px;
+            color: #26382d;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .auth-page input,
+        .auth-page select {
+            display: block;
+            width: 100%;
+            padding: 13px 14px;
+            margin-bottom: 12px;
+            border: 1px solid #cbd8ce;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-family: 'DM Sans', Arial, sans-serif;
+            font-size: 16px;
+        }
+
+        .auth-page input:focus,
+        .auth-page select:focus {
+            outline: 2px solid #9ac8a5;
+            border-color: #14532d;
+        }
+
+        .auth-page form button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 14px;
+            border: none;
+            border-radius: 8px;
+            background: #14532d;
+            color: white;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .auth-page form button:hover {
+            background: #103d2b;
+        }
+
+        .auth-page .auth-switch {
+            margin-top: 24px;
+            color: #37483c;
+            text-align: center;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+
+        .auth-page .auth-switch a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 10px;
+            padding: 12px 22px;
+            border: 1px solid #14532d;
+            border-radius: 8px;
+            background: #14532d;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: 0.2s ease;
+        }
+
+        .auth-page .auth-switch a:hover {
+            border-color: #d6c28a;
+            background: #d6c28a;
+            color: #103d2b;
+        }
+
+        .auth-page .message {
+            margin: 10px 0;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 15px;
+            overflow-wrap: anywhere;
+        }
+
+        @media (max-width: 480px) {
+            .auth-page {
+                padding: 20px 14px;
+            }
+
+            .auth-page .container.small {
+                padding: 24px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="auth-page">
+    <div class="container small">
+
+        <h2>Create Account</h2>
+
+        {% with messages = get_flashed_messages() %}
+            {% for message in messages %}
+                <div class="message">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        <form method="POST">
+            <label for="name">Full Name</label>
+            <input type="text" id="name" name="name" required>
+
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+
+            <button type="submit">Create Account</button>
+        </form>
+
+        <p class="auth-switch">
+            Already have an account?<br>
+            <a href="/login">Sign In →</a>
+        </p>
+
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
