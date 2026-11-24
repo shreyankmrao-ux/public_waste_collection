@@ -156,6 +156,11 @@ class CleaningVerificationTests(unittest.TestCase):
             "Proof Uploaded – Awaiting Admin Review"
         )
 
+        self.set_user("personnel", "staff@gmail.com")
+        staff_dashboard = self.client.get("/personnel")
+        self.assertEqual(staff_dashboard.status_code, 200)
+        self.assertIn(completed["after_photo"].encode(), staff_dashboard.data)
+
         self.set_user("admin", "admin@gmail.com")
         response = self.client.get("/admin")
         self.assertEqual(response.status_code, 200)
@@ -254,9 +259,44 @@ class CleaningVerificationTests(unittest.TestCase):
         conn.close()
         self.assertEqual(report["assigned_to"], other_staff_id)
         self.assertEqual(report["status"], "Assigned")
-        self.assertIsNone(report["after_photo"])
-        self.assertEqual(report["verification_status"], "Awaiting Proof")
+        self.assertEqual(report["after_photo"], "previous-after.jpg")
+        self.assertEqual(
+            report["verification_status"],
+            "Proof Uploaded – Awaiting Admin Review"
+        )
         self.assertIsNone(report["completed_at"])
+
+        self.set_user("personnel", "other@example.test")
+        staff_dashboard = self.client.get("/personnel")
+        self.assertEqual(staff_dashboard.status_code, 200)
+        self.assertIn(b"previous-after.jpg", staff_dashboard.data)
+
+        self.set_user("admin", "admin@gmail.com")
+        admin_dashboard = self.client.get("/admin")
+        self.assertEqual(admin_dashboard.status_code, 200)
+        self.assertIn(b"previous-after.jpg", admin_dashboard.data)
+
+    def test_admin_displays_selected_assignment_category(self):
+        report_id = self.create_assigned_report()
+        self.set_user("admin", "admin@gmail.com")
+
+        response = self.client.post(
+            "/assign/{}".format(report_id),
+            data={"personnel_id": "Sanitation Inspector"}
+        )
+        self.assertEqual(response.status_code, 302)
+
+        response = self.client.get("/admin")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Sanitation Inspector", response.data)
+
+        conn = application.get_db()
+        report = conn.execute(
+            "SELECT assigned_category FROM reports WHERE id = ?",
+            (report_id,)
+        ).fetchone()
+        conn.close()
+        self.assertEqual(report["assigned_category"], "Sanitation Inspector")
 
     def test_migration_preserves_existing_complaint_and_before_photo(self):
         migration_path = os.path.join(self.temp_dir.name, "legacy.db")

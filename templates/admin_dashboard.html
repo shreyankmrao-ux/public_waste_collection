@@ -71,7 +71,7 @@
                                     {% endif %}
                                 </td>
                                 <td><span class="status">{{ report.status }}</span></td>
-                                <td>{{ report.personnel_name or report.assigned_category or 'Not assigned' }}</td>
+                                <td>{{ report.assigned_category or report.personnel_name or 'Not assigned' }}</td>
                                 <td>
                                     <form class="inline-form" method="post" action="{{ url_for('assign', report_id=report.id) }}">
                                         <select name="personnel_id" required>

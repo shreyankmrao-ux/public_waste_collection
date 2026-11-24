@@ -815,8 +815,11 @@ def assign(report_id):
             assigned_to = ?,
             status = 'Assigned',
             assigned_category = ?,
-            after_photo = NULL,
-            verification_status = 'Awaiting Proof',
+            verification_status = CASE
+                WHEN after_photo IS NOT NULL AND after_photo != ''
+                THEN 'Proof Uploaded – Awaiting Admin Review'
+                ELSE 'Awaiting Proof'
+            END,
             completed_at = NULL
         WHERE id = ?
     """, (
