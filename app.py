@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 import sqlite3
 import os
 import re
+import secrets
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime
@@ -24,6 +25,7 @@ STAFF_CATEGORIES = (
     "Area Supervisor",
     "Waste Disposal Staff",
 )
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 
 # =========================================================
@@ -34,6 +36,27 @@ def get_db():
     conn = sqlite3.connect("database.db")
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def save_uploaded_image(upload):
+
+    if not upload or not upload.filename:
+        raise ValueError("Choose an image to upload.")
+
+    extension = os.path.splitext(upload.filename)[1].lower()
+    if extension not in ALLOWED_IMAGE_EXTENSIONS:
+        raise ValueError("Only JPG, JPEG, and PNG images are allowed.")
+
+    signature = upload.stream.read(8)
+    upload.stream.seek(0)
+    is_jpeg = extension in {".jpg", ".jpeg"} and signature.startswith(b"\xff\xd8\xff")
+    is_png = extension == ".png" and signature == b"\x89PNG\r\n\x1a\n"
+    if not (is_jpeg or is_png):
+        raise ValueError("The uploaded file is not a valid JPG, JPEG, or PNG image.")
+
+    filename = secure_filename(f"{secrets.token_hex(16)}{extension}")
+    upload.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+    return filename
 
 
 # =========================================================
@@ -93,6 +116,14 @@ def init_db():
                 SELECT name FROM users WHERE users.id = reports.assigned_to
             )
             WHERE assigned_to IS NOT NULL
+        """)
+        report_columns.add("assigned_category")
+    if "after_photo" not in report_columns:
+        conn.execute("ALTER TABLE reports ADD COLUMN after_photo TEXT")
+    if "verification_status" not in report_columns:
+        conn.execute("""
+            ALTER TABLE reports
+            ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'Awaiting Proof'
         """)
 
     # DEFAULT ADMIN
@@ -436,25 +467,11 @@ def report():
         filename = None
 
         if photo and photo.filename:
-
-            original_name = secure_filename(
-                photo.filename
-            )
-
-            unique_name = (
-                str(datetime.now().timestamp())
-                + "_"
-                + original_name
-            )
-
-            photo.save(
-                os.path.join(
-                    app.config["UPLOAD_FOLDER"],
-                    unique_name
-                )
-            )
-
-            filename = unique_name
+            try:
+                filename = save_uploaded_image(photo)
+            except ValueError as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("report"))
 
         conn = get_db()
 
@@ -692,10 +709,13 @@ def admin_dashboard():
     reports = conn.execute("""
         SELECT
             reports.*,
-            users.name AS citizen_name
+            users.name AS citizen_name,
+            personnel.name AS personnel_name
         FROM reports
         JOIN users
         ON reports.user_id = users.id
+        LEFT JOIN users AS personnel
+        ON reports.assigned_to = personnel.id
         ORDER BY reports.id DESC
     """).fetchall()
 
@@ -794,7 +814,10 @@ def assign(report_id):
         SET
             assigned_to = ?,
             status = 'Assigned',
-            assigned_category = ?
+            assigned_category = ?,
+            after_photo = NULL,
+            verification_status = 'Awaiting Proof',
+            completed_at = NULL
         WHERE id = ?
     """, (
         personnel_id,
@@ -858,39 +881,103 @@ def update_status(report_id):
 
         return redirect(url_for("login"))
 
-    status = request.form["status"]
+    requested_status = request.form.get("status", "")
+    if requested_status not in {"Assigned", "In Progress", "Completed"}:
+        flash("Please choose a valid work status.", "error")
+        return redirect(url_for("personnel_dashboard"))
 
-    completed_at = None
-
-    if status == "Completed":
-
-        completed_at = datetime.now().strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-
+    completed_at = (
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if requested_status == "Completed"
+        else None
+    )
     conn = get_db()
-
-    conn.execute("""
+    result = conn.execute("""
         UPDATE reports
-        SET
-            status = ?,
-            completed_at = ?
-        WHERE
-            id = ?
-            AND assigned_to = ?
+        SET status = ?, completed_at = ?
+        WHERE id = ? AND assigned_to = ?
     """, (
-        status,
+        requested_status,
         completed_at,
         report_id,
         session["user_id"]
     ))
 
+    if not result.rowcount:
+        conn.close()
+        flash("This complaint is not assigned to your account.", "error")
+        return redirect(url_for("personnel_dashboard"))
+
     conn.commit()
+    flash("Complaint status updated successfully.", "success")
     conn.close()
 
     return redirect(
         url_for("personnel_dashboard")
     )
+
+
+@app.route("/upload_after_photo/<int:report_id>", methods=["POST"])
+def upload_after_photo(report_id):
+
+    if session.get("role") != "personnel":
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    try:
+        filename = save_uploaded_image(request.files.get("after_photo"))
+    except ValueError as exc:
+        conn.close()
+        flash(str(exc), "error")
+        return redirect(url_for("personnel_dashboard"))
+
+    result = conn.execute("""
+        UPDATE reports
+        SET after_photo = ?,
+            verification_status = 'Proof Uploaded – Awaiting Admin Review'
+        WHERE id = ?
+            AND assigned_to = ?
+    """, (filename, report_id, session["user_id"]))
+
+    if result.rowcount:
+        conn.commit()
+        flash("AFTER cleaning photograph uploaded successfully.", "success")
+    else:
+        conn.rollback()
+        flash("The complaint is no longer available for an image upload.", "error")
+    conn.close()
+
+    return redirect(url_for("personnel_dashboard"))
+
+
+@app.route("/admin/verify/<int:report_id>", methods=["POST"])
+def verify_cleaning(report_id):
+
+    if session.get("role") != "admin":
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    result = conn.execute("""
+        UPDATE reports
+        SET verification_status = 'Verified by Admin'
+        WHERE id = ?
+            AND status = 'Completed'
+            AND after_photo IS NOT NULL
+            AND after_photo != ''
+    """, (report_id,))
+
+    if result.rowcount:
+        conn.commit()
+        flash("Cleaning evidence verified successfully.", "success")
+    else:
+        conn.rollback()
+        flash(
+            "Only completed complaints with an AFTER photograph can be verified.",
+            "error"
+        )
+    conn.close()
+
+    return redirect(url_for("admin_dashboard"))
 
 
 # =========================================================
