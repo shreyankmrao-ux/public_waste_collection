@@ -696,6 +696,21 @@ class CleaningVerificationTests(unittest.TestCase):
         self.assertIn(b"Choose staff", response.data)
         self.assertIn(b"Sanitation Inspector", response.data)
 
+    def test_report_tables_keep_location_description_and_controls_visible(self):
+        stylesheet = self.client.get("/static/style.css")
+        self.assertEqual(stylesheet.status_code, 200)
+        css = stylesheet.get_data(as_text=True)
+        stylesheet.close()
+
+        self.assertIn(".table-wrap { overflow-x: auto; }", css)
+        self.assertIn(".admin-reports-table { width: 100%; min-width: 1530px;", css)
+        self.assertIn(".personnel-table { width: 100%; min-width: 1250px;", css)
+        self.assertIn(".reports-table { width: 100%; min-width: 1400px;", css)
+        self.assertIn(".personnel-table th:nth-child(3), .personnel-table td:nth-child(3) { width: 190px; }", css)
+        self.assertIn(".personnel-table th:nth-child(4), .personnel-table td:nth-child(4) { width: 230px; }", css)
+        self.assertIn(".personnel-table .inline-form select { min-width: 180px;", css)
+        self.assertIn(".admin-reports-table .inline-form select { min-width: 180px;", css)
+
     def test_report_numbers_are_sequential_in_each_report_list(self):
         first_report_id = self.create_assigned_report()
         second_report_id = self.create_assigned_report()

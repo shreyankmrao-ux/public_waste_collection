@@ -101,23 +101,23 @@ button { cursor: pointer; font: inherit; }
 .content { width: min(1180px, calc(100% - 40px)); margin: 38px auto 64px; }
 .admin-dashboard { width: calc(100% - 24px); max-width: 1900px; }
 .admin-dashboard .panel { padding: 22px; }
-.admin-reports-table { width: 100%; min-width: 1240px; table-layout: fixed; }
-.admin-reports-table th:nth-child(1), .admin-reports-table td:nth-child(1) { width: 4%; }
-.admin-reports-table th:nth-child(2), .admin-reports-table td:nth-child(2) { width: 8%; }
-.admin-reports-table th:nth-child(3), .admin-reports-table td:nth-child(3) { width: 11%; }
-.admin-reports-table th:nth-child(4), .admin-reports-table td:nth-child(4) { width: 15%; }
-.admin-reports-table th:nth-child(5), .admin-reports-table td:nth-child(5) { width: 9%; }
-.admin-reports-table th:nth-child(6), .admin-reports-table td:nth-child(6) { width: 9%; }
-.admin-reports-table th:nth-child(7), .admin-reports-table td:nth-child(7) { width: 9%; }
-.admin-reports-table th:nth-child(8), .admin-reports-table td:nth-child(8) { width: 9%; }
-.admin-reports-table th:nth-child(9), .admin-reports-table td:nth-child(9) { width: 7%; }
-.admin-reports-table th:nth-child(10), .admin-reports-table td:nth-child(10) { width: 9%; }
-.admin-reports-table th:nth-child(11), .admin-reports-table td:nth-child(11) { width: 10%; }
+.admin-reports-table { width: 100%; min-width: 1530px; table-layout: fixed; }
+.admin-reports-table th:nth-child(1), .admin-reports-table td:nth-child(1) { width: 60px; }
+.admin-reports-table th:nth-child(2), .admin-reports-table td:nth-child(2) { width: 110px; }
+.admin-reports-table th:nth-child(3), .admin-reports-table td:nth-child(3) { width: 175px; }
+.admin-reports-table th:nth-child(4), .admin-reports-table td:nth-child(4) { width: 220px; }
+.admin-reports-table th:nth-child(5), .admin-reports-table td:nth-child(5) { width: 130px; }
+.admin-reports-table th:nth-child(6), .admin-reports-table td:nth-child(6) { width: 130px; }
+.admin-reports-table th:nth-child(7), .admin-reports-table td:nth-child(7) { width: 120px; }
+.admin-reports-table th:nth-child(8), .admin-reports-table td:nth-child(8) { width: 120px; }
+.admin-reports-table th:nth-child(9), .admin-reports-table td:nth-child(9) { width: 105px; }
+.admin-reports-table th:nth-child(10), .admin-reports-table td:nth-child(10) { width: 150px; }
+.admin-reports-table th:nth-child(11), .admin-reports-table td:nth-child(11) { width: 210px; }
 .admin-reports-table td { overflow-wrap: normal; word-break: normal; }
 .admin-reports-table td:nth-child(9) .status { white-space: nowrap; }
 .admin-reports-table .admin-report-image { width: 88px; height: 66px; }
 .admin-reports-table .inline-form { min-width: 0; align-items: stretch; flex-direction: column; }
-.admin-reports-table .inline-form select { min-width: 0; width: 100%; margin: 0; }
+.admin-reports-table .inline-form select { min-width: 180px; width: 100%; margin: 0; }
 .admin-reports-table .inline-form button { width: 100%; }
 .content > h1 { margin: 8px 0 24px; color: var(--green); font-size: clamp(28px, 4vw, 38px); }
 .content > .features { width: 100%; margin: 24px 0; }
@@ -145,23 +145,30 @@ tbody tr:hover { background: #fbfdfb; }
 .report-image { display: block; width: min(100%, 560px); max-height: 380px; margin: 18px auto 0; border: 1px solid var(--line); border-radius: 10px; object-fit: contain; background: #f1f5f2; }
 .reports-page > h1 { margin: 8px 0 22px; color: var(--green); font-size: clamp(28px, 4vw, 38px); }
 .reports-panel { margin-top: 0; padding: 22px; }
-.reports-table { min-width: 980px; }
+.reports-table { width: 100%; min-width: 1400px; table-layout: fixed; }
 .reports-table td { vertical-align: middle; }
-.reports-table td:nth-child(3) { min-width: 220px; max-width: 340px; overflow-wrap: anywhere; }
+.reports-table th:nth-child(1), .reports-table td:nth-child(1) { width: 70px; }
+.reports-table th:nth-child(2), .reports-table td:nth-child(2) { width: 240px; }
+.reports-table th:nth-child(3), .reports-table td:nth-child(3) { width: 280px; overflow-wrap: anywhere; }
+.reports-table th:nth-child(4), .reports-table td:nth-child(4) { width: 130px; }
+.reports-table th:nth-child(5), .reports-table td:nth-child(5) { width: 160px; }
+.reports-table th:nth-child(6), .reports-table td:nth-child(6) { width: 160px; }
+.reports-table th:nth-child(7), .reports-table td:nth-child(7) { width: 160px; }
+.reports-table th:nth-child(8), .reports-table td:nth-child(8) { width: 200px; }
 .reports-table .report-image { width: 112px; height: 78px; max-height: none; margin: 0; object-fit: cover; }
 .admin-report-image { width: 96px; height: 72px; max-height: none; margin: 0; object-fit: cover; }
 .photo-empty { color: var(--muted); font-size: 13px; }
-.personnel-table { width: 100%; min-width: 1028px; table-layout: fixed; }
-.personnel-table th:nth-child(1), .personnel-table td:nth-child(1) { width: 54px; }
-.personnel-table th:nth-child(2), .personnel-table td:nth-child(2) { width: 92px; }
-.personnel-table th:nth-child(3), .personnel-table td:nth-child(3) { width: 126px; }
-.personnel-table th:nth-child(4), .personnel-table td:nth-child(4) { width: 176px; }
-.personnel-table th:nth-child(5), .personnel-table td:nth-child(5) { width: 94px; }
-.personnel-table th:nth-child(6), .personnel-table td:nth-child(6) { width: 166px; }
-.personnel-table th:nth-child(7) { width: 320px; text-align: center; }
+.personnel-table { width: 100%; min-width: 1250px; table-layout: fixed; }
+.personnel-table th:nth-child(1), .personnel-table td:nth-child(1) { width: 70px; }
+.personnel-table th:nth-child(2), .personnel-table td:nth-child(2) { width: 110px; }
+.personnel-table th:nth-child(3), .personnel-table td:nth-child(3) { width: 190px; }
+.personnel-table th:nth-child(4), .personnel-table td:nth-child(4) { width: 230px; }
+.personnel-table th:nth-child(5), .personnel-table td:nth-child(5) { width: 120px; }
+.personnel-table th:nth-child(6), .personnel-table td:nth-child(6) { width: 200px; }
+.personnel-table th:nth-child(7), .personnel-table td:nth-child(7) { width: 330px; text-align: center; }
 .personnel-table td { overflow-wrap: normal; word-break: normal; }
 .personnel-table .inline-form { min-width: 0; flex-wrap: wrap; }
-.personnel-table .inline-form select { min-width: 0; width: 100%; margin: 0; }
+.personnel-table .inline-form select { min-width: 180px; width: 100%; margin: 0; }
 .personnel-table .inline-form button { width: 100%; }
 .after-cleaning-cell { padding: 16px; }
 .after-cleaning-cell > a { display: block; width: fit-content; margin: 0 auto 12px; }
