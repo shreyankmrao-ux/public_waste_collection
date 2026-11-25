@@ -585,6 +585,18 @@ class CleaningVerificationTests(unittest.TestCase):
         conn.close()
         self.assertEqual(report["assigned_category"], "Sanitation Inspector")
 
+    def test_admin_dashboard_renders_staff_assignment_controls(self):
+        self.create_assigned_report()
+        self.set_user("admin", "admin@gmail.com")
+
+        response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Assign personnel", response.data)
+        self.assertIn(b'name="personnel_id"', response.data)
+        self.assertIn(b"Choose staff", response.data)
+        self.assertIn(b"Sanitation Inspector", response.data)
+
     def test_migration_preserves_existing_complaint_and_before_photo(self):
         migration_path = os.path.join(self.temp_dir.name, "legacy.db")
         conn = sqlite3.connect(migration_path)

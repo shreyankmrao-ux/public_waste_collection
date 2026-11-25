@@ -101,18 +101,20 @@ button { cursor: pointer; font: inherit; }
 .content { width: min(1180px, calc(100% - 40px)); margin: 38px auto 64px; }
 .admin-dashboard { width: calc(100% - 24px); max-width: 1900px; }
 .admin-dashboard .panel { padding: 22px; }
-.admin-reports-table { width: 100%; min-width: 1060px; table-layout: fixed; }
-.admin-reports-table th:nth-child(1), .admin-reports-table td:nth-child(1) { width: 5%; }
-.admin-reports-table th:nth-child(2), .admin-reports-table td:nth-child(2) { width: 10%; }
-.admin-reports-table th:nth-child(3), .admin-reports-table td:nth-child(3) { width: 13%; }
-.admin-reports-table th:nth-child(4), .admin-reports-table td:nth-child(4) { width: 23%; }
+.admin-reports-table { width: 100%; min-width: 1240px; table-layout: fixed; }
+.admin-reports-table th:nth-child(1), .admin-reports-table td:nth-child(1) { width: 4%; }
+.admin-reports-table th:nth-child(2), .admin-reports-table td:nth-child(2) { width: 8%; }
+.admin-reports-table th:nth-child(3), .admin-reports-table td:nth-child(3) { width: 11%; }
+.admin-reports-table th:nth-child(4), .admin-reports-table td:nth-child(4) { width: 15%; }
 .admin-reports-table th:nth-child(5), .admin-reports-table td:nth-child(5) { width: 9%; }
 .admin-reports-table th:nth-child(6), .admin-reports-table td:nth-child(6) { width: 9%; }
-.admin-reports-table th:nth-child(7), .admin-reports-table td:nth-child(7) { width: 8%; }
-.admin-reports-table th:nth-child(8), .admin-reports-table td:nth-child(8) { width: 10%; }
-.admin-reports-table th:nth-child(9), .admin-reports-table td:nth-child(9) { width: 13%; }
+.admin-reports-table th:nth-child(7), .admin-reports-table td:nth-child(7) { width: 9%; }
+.admin-reports-table th:nth-child(8), .admin-reports-table td:nth-child(8) { width: 9%; }
+.admin-reports-table th:nth-child(9), .admin-reports-table td:nth-child(9) { width: 7%; }
+.admin-reports-table th:nth-child(10), .admin-reports-table td:nth-child(10) { width: 9%; }
+.admin-reports-table th:nth-child(11), .admin-reports-table td:nth-child(11) { width: 10%; }
 .admin-reports-table td { overflow-wrap: normal; word-break: normal; }
-.admin-reports-table td:nth-child(7) .status { white-space: nowrap; }
+.admin-reports-table td:nth-child(9) .status { white-space: nowrap; }
 .admin-reports-table .admin-report-image { width: 88px; height: 66px; }
 .admin-reports-table .inline-form { min-width: 0; align-items: stretch; flex-direction: column; }
 .admin-reports-table .inline-form select { min-width: 0; width: 100%; margin: 0; }
