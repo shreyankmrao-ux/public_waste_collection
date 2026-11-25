@@ -35,7 +35,7 @@
                 <tbody>
                     {% for report in reports %}
                         <tr>
-                            <td>#{{ report.id }}</td>
+                            <td>#{{ loop.index }}</td>
                             <td>{{ report.citizen_name or 'Unknown citizen' }}</td>
                             <td>{{ report.location }}</td>
                             <td>{{ report.description }}</td>
@@ -53,7 +53,7 @@
                             <td class="after-cleaning-cell">
                                 {% if report.after_photo %}
                                     <a href="{{ url_for('uploaded_file', filename=report.after_photo) }}" target="_blank" rel="noopener">
-                                        <img src="{{ url_for('uploaded_file', filename=report.after_photo) }}" class="report-image admin-report-image" alt="After cleaning for report #{{ report.id }}" loading="lazy">
+                                        <img src="{{ url_for('uploaded_file', filename=report.after_photo) }}" class="report-image admin-report-image" alt="After cleaning for report #{{ loop.index }}" loading="lazy">
                                     </a>
                                 {% else %}
                                     <div class="after-photo-placeholder">After photo not uploaded</div>

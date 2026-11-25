@@ -59,7 +59,7 @@
                 <tbody>
                     {% for report in reports %}
                     <tr>
-                        <td>#{{ report.id }}</td>
+                        <td>#{{ loop.index }}</td>
                         <td>{{ report.location }}</td>
                         <td>{{ report.description }}</td>
                         <td><span class="status">{{ report.status }}</span></td>
@@ -70,7 +70,7 @@
                             <img
                                 src="{{ url_for('uploaded_file', filename=report.photo) }}"
                                 class="report-image"
-                                alt="Photo for report #{{ report.id }}">
+                                alt="Photo for report #{{ loop.index }}">
                             {% else %}
                             <span class="photo-empty">No photo</span>
                             {% endif %}
@@ -81,7 +81,7 @@
                                 <img
                                     src="{{ url_for('uploaded_file', filename=report.after_photo) }}"
                                     class="report-image"
-                                    alt="After cleaning proof for report #{{ report.id }}">
+                                    alt="After cleaning proof for report #{{ loop.index }}">
                             </a>
                             {% else %}
                             <span class="photo-empty">Awaiting Cleaning Proof</span>

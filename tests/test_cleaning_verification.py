@@ -597,6 +597,29 @@ class CleaningVerificationTests(unittest.TestCase):
         self.assertIn(b"Choose staff", response.data)
         self.assertIn(b"Sanitation Inspector", response.data)
 
+    def test_report_numbers_are_sequential_in_each_report_list(self):
+        first_report_id = self.create_assigned_report()
+        second_report_id = self.create_assigned_report()
+        self.assertNotEqual(first_report_id, second_report_id)
+
+        self.set_user("admin", "admin@gmail.com")
+        admin_dashboard = self.client.get("/admin")
+        self.assertEqual(admin_dashboard.status_code, 200)
+        self.assertIn(b"<td>#1</td>", admin_dashboard.data)
+        self.assertIn(b"<td>#2</td>", admin_dashboard.data)
+
+        self.set_user("personnel", "staff@gmail.com")
+        personnel_dashboard = self.client.get("/personnel")
+        self.assertEqual(personnel_dashboard.status_code, 200)
+        self.assertIn(b"<td>#1</td>", personnel_dashboard.data)
+        self.assertIn(b"<td>#2</td>", personnel_dashboard.data)
+
+        self.set_user("citizen", "citizen@example.test")
+        my_reports = self.client.get("/my_reports")
+        self.assertEqual(my_reports.status_code, 200)
+        self.assertIn(b"<td>#1</td>", my_reports.data)
+        self.assertIn(b"<td>#2</td>", my_reports.data)
+
     def test_migration_preserves_existing_complaint_and_before_photo(self):
         migration_path = os.path.join(self.temp_dir.name, "legacy.db")
         conn = sqlite3.connect(migration_path)
