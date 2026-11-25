@@ -271,6 +271,9 @@ def init_db():
     conn.close()
     
 
+init_db()
+
+
 @app.cli.command("area-admin-setup")
 def area_admin_setup():
     """Create or replace Area Administrator credentials interactively."""
@@ -1134,8 +1137,6 @@ def verify_cleaning(report_id):
 
 
 if __name__ == "__main__":
-    init_db()
-
     Timer(
         1.5,
         lambda: webbrowser.open("http://127.0.0.1:5000/")

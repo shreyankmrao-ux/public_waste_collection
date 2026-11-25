@@ -54,8 +54,8 @@
                                 <td>{{ report.description }}</td>
                                 <td>
                                     {% if report.photo %}
-                                        <a href="{{ url_for('static', filename='uploads/' + report.photo) }}" target="_blank" rel="noopener">
-                                            <img src="{{ url_for('static', filename='uploads/' + report.photo) }}" class="report-image admin-report-image" alt="Waste reported for #{{ report.id }}" loading="lazy">
+                                        <a href="{{ url_for('uploaded_file', filename=report.photo) }}" target="_blank" rel="noopener">
+                                            <img src="{{ url_for('uploaded_file', filename=report.photo) }}" class="report-image admin-report-image" alt="Waste reported for #{{ report.id }}" loading="lazy">
                                         </a>
                                     {% else %}
                                         <span class="photo-empty">No photo</span>
@@ -63,8 +63,8 @@
                                 </td>
                                 <td>
                                     {% if report.after_photo %}
-                                        <a href="{{ url_for('static', filename='uploads/' + report.after_photo) }}" target="_blank" rel="noopener">
-                                            <img src="{{ url_for('static', filename='uploads/' + report.after_photo) }}" class="report-image admin-report-image" alt="After cleaning proof for #{{ report.id }}" loading="lazy">
+                                        <a href="{{ url_for('uploaded_file', filename=report.after_photo) }}" target="_blank" rel="noopener">
+                                            <img src="{{ url_for('uploaded_file', filename=report.after_photo) }}" class="report-image admin-report-image" alt="After cleaning proof for #{{ report.id }}" loading="lazy">
                                         </a>
                                     {% else %}
                                         <span class="photo-empty">Awaiting Cleaning Proof</span>
