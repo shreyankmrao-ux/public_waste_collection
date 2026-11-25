@@ -1,10 +1,24 @@
 import webbrowser
 from threading import Timer
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    flash,
+    send_from_directory,
+)
+from werkzeug.exceptions import NotFound
 import sqlite3
 import os
 import re
 import secrets
+import shutil
+import smtplib
+import ssl
+from email.message import EmailMessage
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime
@@ -12,12 +26,34 @@ import click
 
 app = Flask(__name__)
 
-app.secret_key = "public_waste_collection_secret"
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "public_waste_collection_secret"
+)
 
-UPLOAD_FOLDER = "static/uploads"
+DATA_DIR = os.environ.get("DATA_DIR")
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE_PATH = os.environ.get(
+    "DATABASE_PATH",
+    os.path.join(DATA_DIR, "database.db")
+    if DATA_DIR
+    else os.path.join(PROJECT_DIR, "database.db")
+)
+UPLOAD_FOLDER = os.environ.get(
+    "UPLOAD_FOLDER",
+    os.path.join(DATA_DIR, "uploads")
+    if DATA_DIR
+    else os.path.join(PROJECT_DIR, "static", "uploads")
+)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+os.makedirs(os.path.dirname(os.path.abspath(DATABASE_PATH)), exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+if DATA_DIR and not os.path.exists(DATABASE_PATH):
+    bundled_database = os.path.join(PROJECT_DIR, "database.db")
+    if os.path.isfile(bundled_database):
+        shutil.copy2(bundled_database, DATABASE_PATH)
 
 STAFF_CATEGORIES = (
     "Waste Collection Staff",
@@ -33,9 +69,74 @@ ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 # =========================================================
 
 def get_db():
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DATABASE_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def send_assignment_email(recipient, report_id, location, description):
+    settings = {
+        "SMTP_HOST": os.environ.get("SMTP_HOST", "").strip(),
+        "SMTP_USERNAME": os.environ.get("SMTP_USERNAME", "").strip(),
+        "SMTP_PASSWORD": os.environ.get("SMTP_PASSWORD", ""),
+        "MAIL_FROM": os.environ.get("MAIL_FROM", "").strip(),
+    }
+    missing_settings = [
+        key for key, value in settings.items() if not value
+    ]
+    if missing_settings:
+        app.logger.warning(
+            "Assignment email not sent; missing Render environment variables: %s",
+            ", ".join(missing_settings)
+        )
+        return False
+
+    try:
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        use_ssl = os.environ.get(
+            "SMTP_USE_SSL",
+            "false"
+        ).strip().lower() in {"1", "true", "yes"}
+        message = EmailMessage()
+        message["Subject"] = f"Waste collection report #{report_id} assigned"
+        message["From"] = settings["MAIL_FROM"]
+        message["To"] = recipient
+        message.set_content(
+            "A waste collection report has been assigned to you.\n\n"
+            f"Report: #{report_id}\n"
+            f"Location: {location}\n"
+            f"Description: {description}\n"
+        )
+
+        if use_ssl:
+            smtp_client = smtplib.SMTP_SSL(
+                settings["SMTP_HOST"],
+                smtp_port,
+                timeout=15,
+                context=ssl.create_default_context()
+            )
+        else:
+            smtp_client = smtplib.SMTP(
+                settings["SMTP_HOST"],
+                smtp_port,
+                timeout=15
+            )
+
+        with smtp_client as smtp:
+            smtp.ehlo()
+            if not use_ssl:
+                smtp.starttls(context=ssl.create_default_context())
+                smtp.ehlo()
+            smtp.login(
+                settings["SMTP_USERNAME"],
+                settings["SMTP_PASSWORD"]
+            )
+            smtp.send_message(message)
+    except (OSError, smtplib.SMTPException, ValueError):
+        app.logger.exception("Failed to send staff assignment email")
+        return False
+
+    return True
 
 
 def save_uploaded_image(upload):
@@ -166,16 +267,6 @@ def init_db():
             "personnel"
         ))
 
-    conn.execute(
-        "UPDATE users SET password = ? WHERE email = ?",
-        ("admin@123", "admin@gmail.com")
-    )
-
-    conn.execute(
-        "UPDATE users SET password = ? WHERE email = ?",
-        ("staff@123", "staff@gmail.com")
-    )
-
     conn.commit()
     conn.close()
     
@@ -265,6 +356,17 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/uploads/<path:filename>")
+def uploaded_file(filename):
+    try:
+        return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    except NotFound:
+        return send_from_directory(
+            os.path.join(PROJECT_DIR, "static", "uploads"),
+            filename
+        )
+
+
 # =========================================================
 # REGISTER
 # =========================================================
@@ -275,7 +377,7 @@ def register():
     if request.method == "POST":
 
         name = request.form["name"]
-        email = request.form["email"]
+        email = request.form["email"].strip().lower()
         password = request.form["password"]
 
         conn = get_db()
@@ -289,7 +391,7 @@ def register():
             """, (
                 name,
                 email,
-                password,
+                generate_password_hash(password),
                 "citizen"
             ))
 
@@ -317,7 +419,7 @@ def login():
 
     if request.method == "POST":
 
-        email = request.form["email"]
+        email = request.form["email"].strip().lower()
         password = request.form["password"]
 
         conn = get_db()
@@ -325,7 +427,7 @@ def login():
         user = conn.execute("""
             SELECT *
             FROM users
-            WHERE email = ?
+            WHERE lower(email) = ?
         """, (
             email,
         )).fetchone()
@@ -766,7 +868,7 @@ def assign(report_id):
     selected_staff = request.form.get("personnel_id", "")
     if selected_staff in STAFF_CATEGORIES:
         personnel = conn.execute("""
-            SELECT id
+            SELECT id, name, email
             FROM users
             WHERE role = 'personnel' AND name = ?
             ORDER BY id
@@ -775,7 +877,7 @@ def assign(report_id):
 
         if personnel is None:
             personnel = conn.execute("""
-                SELECT id
+                SELECT id, name, email
                 FROM users
                 WHERE role = 'personnel'
                 ORDER BY CASE WHEN name = 'Waste Collection Staff' THEN 0 ELSE 1 END, id
@@ -798,7 +900,7 @@ def assign(report_id):
             return redirect(url_for("admin_dashboard"))
 
         personnel = conn.execute("""
-            SELECT id, name
+            SELECT id, name, email
             FROM users
             WHERE id = ? AND role = 'personnel'
         """, (personnel_id,)).fetchone()
@@ -808,6 +910,16 @@ def assign(report_id):
             return redirect(url_for("admin_dashboard"))
 
         assigned_category = personnel["name"]
+
+    report = conn.execute("""
+        SELECT location, description
+        FROM reports
+        WHERE id = ?
+    """, (report_id,)).fetchone()
+    if report is None:
+        conn.close()
+        flash("The report could not be found.")
+        return redirect(url_for("admin_dashboard"))
 
     conn.execute("""
         UPDATE reports
@@ -830,6 +942,21 @@ def assign(report_id):
 
     conn.commit()
     conn.close()
+
+    email_sent = send_assignment_email(
+        personnel["email"],
+        report_id,
+        report["location"],
+        report["description"]
+    )
+    if email_sent:
+        flash("Report assigned and staff notification email sent.", "success")
+    else:
+        flash(
+            "Report assigned, but the staff notification email was not sent. "
+            "Check the SMTP environment variables and Render logs.",
+            "warning"
+        )
 
     return redirect(
         url_for("admin_dashboard")
@@ -895,6 +1022,24 @@ def update_status(report_id):
         else None
     )
     conn = get_db()
+    if requested_status == "Completed":
+        report = conn.execute("""
+            SELECT after_photo
+            FROM reports
+            WHERE id = ? AND assigned_to = ?
+        """, (report_id, session["user_id"])).fetchone()
+        if report is None:
+            conn.close()
+            flash("This complaint is not assigned to your account.", "error")
+            return redirect(url_for("personnel_dashboard"))
+        if not report["after_photo"]:
+            conn.close()
+            flash(
+                "Upload an after-cleaning photo before marking this complaint completed.",
+                "error"
+            )
+            return redirect(url_for("personnel_dashboard"))
+
     result = conn.execute("""
         UPDATE reports
         SET status = ?, completed_at = ?

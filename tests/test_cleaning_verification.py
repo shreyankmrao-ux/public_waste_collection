@@ -1,8 +1,11 @@
 import io
+import importlib
 import os
 import sqlite3
+import sys
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
 import app as application
 
@@ -161,6 +164,12 @@ class CleaningVerificationTests(unittest.TestCase):
         self.assertEqual(citizen_reports.status_code, 200)
         self.assertIn(b"After cleaning</th>", citizen_reports.data)
         self.assertIn(completed["after_photo"].encode(), citizen_reports.data)
+        after_photo_response = self.client.get(
+            "/uploads/{}".format(completed["after_photo"])
+        )
+        self.assertEqual(after_photo_response.status_code, 200)
+        self.assertEqual(after_photo_response.data, PNG_BYTES)
+        after_photo_response.close()
 
         self.set_user("personnel", "staff@gmail.com")
         staff_dashboard = self.client.get("/personnel")
@@ -188,7 +197,152 @@ class CleaningVerificationTests(unittest.TestCase):
         self.assertEqual(verified["status"], "Completed")
         self.assertEqual(verified["verification_status"], "Verified by Admin")
 
-    def test_staff_can_update_status_without_after_photo(self):
+    def test_assignment_sends_staff_email_using_configured_smtp(self):
+        report_id = self.create_assigned_report()
+        self.set_user("admin", "admin@gmail.com")
+        smtp_connection = Mock()
+        smtp_context = Mock()
+        smtp_context.__enter__ = Mock(return_value=smtp_connection)
+        smtp_context.__exit__ = Mock(return_value=False)
+
+        with patch.dict(os.environ, {
+            "SMTP_HOST": "smtp.example.test",
+            "SMTP_PORT": "587",
+            "SMTP_USERNAME": "mailer@example.test",
+            "SMTP_PASSWORD": "test-secret",
+            "MAIL_FROM": "mailer@example.test",
+        }), patch("app.smtplib.SMTP", return_value=smtp_context) as smtp:
+            response = self.client.post(
+                "/assign/{}".format(report_id),
+                data={"personnel_id": str(self.get_user_id("staff@gmail.com"))},
+                follow_redirects=True
+            )
+
+        self.assertEqual(response.status_code, 200)
+        smtp.assert_called_once_with(
+            "smtp.example.test",
+            587,
+            timeout=15
+        )
+        smtp_connection.starttls.assert_called_once()
+        smtp_connection.login.assert_called_once_with(
+            "mailer@example.test",
+            "test-secret"
+        )
+        message = smtp_connection.send_message.call_args.args[0]
+        self.assertEqual(message["To"], "staff@gmail.com")
+        self.assertIn(f"#{report_id}", message["Subject"])
+        self.assertIn("Test location", message.get_content())
+        self.assertIn(
+            b"staff notification email sent",
+            response.data
+        )
+
+    def test_assignment_succeeds_when_smtp_is_not_configured(self):
+        report_id = self.create_assigned_report()
+        staff_id = self.get_user_id("staff@gmail.com")
+        self.set_user("admin", "admin@gmail.com")
+
+        with patch.dict(os.environ, {}, clear=True):
+            response = self.client.post(
+                "/assign/{}".format(report_id),
+                data={"personnel_id": str(staff_id)},
+                follow_redirects=True
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            b"staff notification email was not sent",
+            response.data
+        )
+        conn = application.get_db()
+        report = conn.execute(
+            "SELECT assigned_to, status FROM reports WHERE id = ?",
+            (report_id,)
+        ).fetchone()
+        conn.close()
+        self.assertEqual(report["assigned_to"], staff_id)
+        self.assertEqual(report["status"], "Assigned")
+
+    def test_wsgi_startup_migrates_database_before_assignment(self):
+        legacy_database_path = os.path.join(self.temp_dir.name, "legacy.db")
+        conn = sqlite3.connect(legacy_database_path)
+        conn.executescript("""
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL
+            );
+            CREATE TABLE reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                location TEXT NOT NULL,
+                description TEXT NOT NULL,
+                photo TEXT,
+                status TEXT DEFAULT 'Pending',
+                assigned_to INTEGER,
+                created_at TEXT,
+                completed_at TEXT
+            );
+            CREATE TABLE ward_pincodes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pincode TEXT NOT NULL UNIQUE,
+                city TEXT NOT NULL,
+                ward_name TEXT NOT NULL,
+                added_by INTEGER NOT NULL
+            );
+        """)
+        conn.commit()
+        conn.close()
+
+        original_database_path = application.DATABASE_PATH
+        mocked_get_db = application.get_db
+        application.DATABASE_PATH = legacy_database_path
+        application.get_db = self.original_get_db
+        sys.modules.pop("wsgi", None)
+        try:
+            importlib.import_module("wsgi")
+
+            conn = application.get_db()
+            citizen_cursor = conn.execute(
+                "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
+                ("Legacy Citizen", "legacy@example.test", "password", "citizen")
+            )
+            report_cursor = conn.execute("""
+                INSERT INTO reports
+                    (user_id, location, description, status)
+                VALUES (?, ?, ?, ?)
+            """, (citizen_cursor.lastrowid, "Legacy location", "Legacy report", "Pending"))
+            report_id = report_cursor.lastrowid
+            conn.commit()
+            conn.close()
+
+            self.set_user("admin", "admin@gmail.com")
+            response = self.client.post(
+                "/assign/{}".format(report_id),
+                data={"personnel_id": str(self.get_user_id("staff@gmail.com"))}
+            )
+            self.assertEqual(response.status_code, 302)
+
+            conn = application.get_db()
+            report = conn.execute("""
+                SELECT assigned_to, assigned_category, status
+                FROM reports WHERE id = ?
+            """, (report_id,)).fetchone()
+            conn.close()
+            self.assertEqual(report["status"], "Assigned")
+            self.assertEqual(
+                report["assigned_to"],
+                self.get_user_id("staff@gmail.com")
+            )
+        finally:
+            application.DATABASE_PATH = original_database_path
+            application.get_db = mocked_get_db
+            sys.modules.pop("wsgi", None)
+
+    def test_staff_cannot_complete_without_after_photo(self):
         report_id = self.create_assigned_report()
         self.set_user("personnel", "staff@gmail.com")
 
@@ -203,6 +357,10 @@ class CleaningVerificationTests(unittest.TestCase):
             follow_redirects=True
         )
         self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            b"Upload an after-cleaning photo before marking this complaint completed.",
+            response.data
+        )
 
         conn = application.get_db()
         report = conn.execute(
@@ -210,8 +368,76 @@ class CleaningVerificationTests(unittest.TestCase):
             (report_id,)
         ).fetchone()
         conn.close()
-        self.assertEqual(report["status"], "Completed")
+        self.assertEqual(report["status"], "In Progress")
         self.assertIsNone(report["after_photo"])
+
+    def test_login_matches_email_case_insensitively_and_trims_whitespace(self):
+        conn = application.get_db()
+        conn.execute(
+            "UPDATE users SET email = ? WHERE email = ?",
+            ("Citizen@Example.Test", "citizen@example.test")
+        )
+        conn.commit()
+        conn.close()
+
+        response = self.client.post("/login", data={
+            "email": "  CITIZEN@example.test ",
+            "password": "password"
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/dashboard")
+        with self.client.session_transaction() as session:
+            self.assertEqual(session["role"], "citizen")
+
+    def test_registration_normalizes_email_address(self):
+        response = self.client.post("/register", data={
+            "name": "New Citizen",
+            "email": "  New.User@Example.Test ",
+            "password": "new-password"
+        })
+
+        self.assertEqual(response.status_code, 302)
+        conn = application.get_db()
+        user = conn.execute(
+            "SELECT email, password FROM users WHERE name = ?",
+            ("New Citizen",)
+        ).fetchone()
+        conn.close()
+        self.assertEqual(user["email"], "new.user@example.test")
+        self.assertTrue(
+            application.check_password_hash(user["password"], "new-password")
+        )
+
+    def test_database_initialization_preserves_existing_admin_and_staff_passwords(self):
+        conn = application.get_db()
+        conn.execute(
+            "UPDATE users SET password = ? WHERE email = ?",
+            ("custom-admin-password", "admin@gmail.com")
+        )
+        conn.execute(
+            "UPDATE users SET password = ? WHERE email = ?",
+            ("custom-staff-password", "staff@gmail.com")
+        )
+        conn.commit()
+        conn.close()
+
+        application.init_db()
+
+        conn = application.get_db()
+        passwords = conn.execute("""
+            SELECT email, password
+            FROM users
+            WHERE email IN ('admin@gmail.com', 'staff@gmail.com')
+        """).fetchall()
+        conn.close()
+        self.assertEqual(
+            {row["email"]: row["password"] for row in passwords},
+            {
+                "admin@gmail.com": "custom-admin-password",
+                "staff@gmail.com": "custom-staff-password",
+            }
+        )
 
     def test_unassigned_staff_cannot_change_status_or_upload_proof(self):
         report_id = self.create_assigned_report()
