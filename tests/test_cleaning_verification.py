@@ -156,6 +156,12 @@ class CleaningVerificationTests(unittest.TestCase):
             "Proof Uploaded – Awaiting Admin Review"
         )
 
+        self.set_user("citizen", "citizen@example.test")
+        citizen_reports = self.client.get("/my_reports")
+        self.assertEqual(citizen_reports.status_code, 200)
+        self.assertIn(b"After cleaning</th>", citizen_reports.data)
+        self.assertIn(completed["after_photo"].encode(), citizen_reports.data)
+
         self.set_user("personnel", "staff@gmail.com")
         staff_dashboard = self.client.get("/personnel")
         self.assertEqual(staff_dashboard.status_code, 200)
