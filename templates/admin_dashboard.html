@@ -38,6 +38,8 @@
                             <th>Citizen</th>
                             <th>Location</th>
                             <th>Description</th>
+                            <th>Reported</th>
+                            <th>Completed</th>
                             <th>Photo</th>
                             <th>After cleaning</th>
                             <th>Status</th>
@@ -52,6 +54,8 @@
                                 <td>{{ report.citizen_name or 'Unknown citizen' }}</td>
                                 <td>{{ report.location }}</td>
                                 <td>{{ report.description }}</td>
+                                <td>{{ report.created_at or '—' }}</td>
+                                <td>{{ report.completed_at or '—' }}</td>
                                 <td>
                                     {% if report.photo %}
                                         <a href="{{ url_for('uploaded_file', filename=report.photo) }}" target="_blank" rel="noopener">
@@ -85,7 +89,7 @@
                                 </td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="9">No reports submitted yet.</td></tr>
+                            <tr><td colspan="11">No reports submitted yet.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

@@ -202,15 +202,16 @@ class CleaningVerificationTests(unittest.TestCase):
         conn = application.get_db()
         cursor = conn.execute("""
             INSERT INTO reports
-                (user_id, location, description, status, assigned_to, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (user_id, location, description, status, assigned_to, created_at, completed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             999999,
             "Legacy location",
             "Report with missing citizen account",
             "Assigned",
             staff_id,
-            "2026-01-02 10:00:00"
+            "2026-01-02 10:00:00",
+            "2026-01-03 14:25:00"
         ))
         report_id = cursor.lastrowid
         conn.commit()
@@ -221,6 +222,10 @@ class CleaningVerificationTests(unittest.TestCase):
         self.assertEqual(admin_dashboard.status_code, 200)
         self.assertIn(f"#{report_id}".encode(), admin_dashboard.data)
         self.assertIn(b"Unknown citizen", admin_dashboard.data)
+        self.assertIn(b"Reported", admin_dashboard.data)
+        self.assertIn(b"Completed", admin_dashboard.data)
+        self.assertIn(b"2026-01-02 10:00:00", admin_dashboard.data)
+        self.assertIn(b"2026-01-03 14:25:00", admin_dashboard.data)
 
         self.set_user("personnel", "staff@gmail.com")
         personnel_dashboard = self.client.get("/personnel")
