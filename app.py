@@ -22,10 +22,12 @@ import tempfile
 from email.message import EmailMessage
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import click
 
 app = Flask(__name__)
+
+REPORT_DISPLAY_TIMEZONE = timezone(timedelta(hours=5, minutes=30), "IST")
 
 app.secret_key = os.environ.get(
     "SECRET_KEY",
@@ -119,6 +121,24 @@ def get_db():
     conn = sqlite3.connect(DATABASE_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+@app.template_filter("local_datetime")
+def local_datetime(value):
+    if not value:
+        return "—"
+
+    try:
+        parsed = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return value
+
+    if parsed.tzinfo is None:
+        parsed = parsed.astimezone()
+
+    return parsed.astimezone(REPORT_DISPLAY_TIMEZONE).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
 
 
 def send_assignment_email(recipient, report_id, location, description):

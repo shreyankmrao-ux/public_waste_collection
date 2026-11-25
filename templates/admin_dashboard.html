@@ -54,8 +54,8 @@
                                 <td>{{ report.citizen_name or 'Unknown citizen' }}</td>
                                 <td>{{ report.location }}</td>
                                 <td>{{ report.description }}</td>
-                                <td>{{ report.created_at or '—' }}</td>
-                                <td>{{ report.completed_at or '—' }}</td>
+                                <td>{{ report.created_at|local_datetime }}</td>
+                                <td>{{ report.completed_at|local_datetime }}</td>
                                 <td>
                                     {% if report.photo %}
                                         <a href="{{ url_for('uploaded_file', filename=report.photo) }}" target="_blank" rel="noopener">

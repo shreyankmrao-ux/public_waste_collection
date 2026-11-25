@@ -63,8 +63,8 @@
                         <td>{{ report.location }}</td>
                         <td>{{ report.description }}</td>
                         <td><span class="status">{{ report.status }}</span></td>
-                        <td>{{ report.created_at }}</td>
-                        <td>{{ report.completed_at or '—' }}</td>
+                        <td>{{ report.created_at|local_datetime }}</td>
+                        <td>{{ report.completed_at|local_datetime }}</td>
                         <td>
                             {% if report.photo %}
                             <img

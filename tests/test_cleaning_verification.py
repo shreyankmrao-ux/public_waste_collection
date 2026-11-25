@@ -552,6 +552,17 @@ class CleaningVerificationTests(unittest.TestCase):
             config = runpy.run_path(config_path)
         self.assertEqual(config["bind"], "0.0.0.0:43123")
 
+    def test_datetime_filter_converts_utc_to_india_local_time(self):
+        self.assertEqual(
+            application.local_datetime("2026-11-25T17:26:22+00:00"),
+            "2026-11-25 22:56:22"
+        )
+        self.assertEqual(application.local_datetime(None), "—")
+        self.assertEqual(
+            application.local_datetime("legacy timestamp"),
+            "legacy timestamp"
+        )
+
     def test_database_initialization_preserves_existing_admin_and_staff_passwords(self):
         conn = application.get_db()
         conn.execute(
