@@ -409,6 +409,25 @@ class CleaningVerificationTests(unittest.TestCase):
             application.check_password_hash(user["password"], "new-password")
         )
 
+    def test_existing_uploads_are_migrated_without_overwriting_disk_files(self):
+        source_folder = os.path.join(self.temp_dir.name, "legacy-uploads")
+        destination_folder = os.path.join(self.temp_dir.name, "persistent-uploads")
+        os.makedirs(source_folder)
+        os.makedirs(destination_folder)
+        with open(os.path.join(source_folder, "legacy.jpg"), "wb") as image:
+            image.write(JPEG_BYTES)
+        with open(os.path.join(source_folder, "existing.jpg"), "wb") as image:
+            image.write(b"old-version")
+        with open(os.path.join(destination_folder, "existing.jpg"), "wb") as image:
+            image.write(b"persistent-version")
+
+        application.migrate_existing_uploads(source_folder, destination_folder)
+
+        with open(os.path.join(destination_folder, "legacy.jpg"), "rb") as image:
+            self.assertEqual(image.read(), JPEG_BYTES)
+        with open(os.path.join(destination_folder, "existing.jpg"), "rb") as image:
+            self.assertEqual(image.read(), b"persistent-version")
+
     def test_database_initialization_preserves_existing_admin_and_staff_passwords(self):
         conn = application.get_db()
         conn.execute(

@@ -50,10 +50,29 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(os.path.dirname(os.path.abspath(DATABASE_PATH)), exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+
+def migrate_existing_uploads(source_folder, destination_folder):
+    if os.path.abspath(source_folder) == os.path.abspath(destination_folder):
+        return
+
+    if not os.path.isdir(source_folder):
+        return
+
+    for filename in os.listdir(source_folder):
+        source = os.path.join(source_folder, filename)
+        destination = os.path.join(destination_folder, filename)
+        if os.path.isfile(source) and not os.path.exists(destination):
+            shutil.copy2(source, destination)
+
+
 if DATA_DIR and not os.path.exists(DATABASE_PATH):
     bundled_database = os.path.join(PROJECT_DIR, "database.db")
     if os.path.isfile(bundled_database):
         shutil.copy2(bundled_database, DATABASE_PATH)
+
+if DATA_DIR:
+    legacy_upload_folder = os.path.join(PROJECT_DIR, "static", "uploads")
+    migrate_existing_uploads(legacy_upload_folder, UPLOAD_FOLDER)
 
 STAFF_CATEGORIES = (
     "Waste Collection Staff",
