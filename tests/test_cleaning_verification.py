@@ -1,9 +1,11 @@
 import io
 import importlib
 import os
+import runpy
 import sqlite3
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 import unittest
 from unittest.mock import Mock, patch
 
@@ -73,6 +75,35 @@ class CleaningVerificationTests(unittest.TestCase):
             session["name"] = user["name"]
             session["role"] = role
         return user["id"]
+
+    def test_public_and_role_dashboard_routes_render(self):
+        for path in ("/", "/login", "/register"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
+        self.set_user("citizen", "citizen@example.test")
+        for path in ("/dashboard", "/report", "/my_reports"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
+        self.set_user("admin", "admin@gmail.com")
+        self.assertEqual(self.client.get("/admin").status_code, 200)
+
+        self.set_user("personnel", "staff@gmail.com")
+        self.assertEqual(self.client.get("/personnel").status_code, 200)
+
+        conn = application.get_db()
+        conn.execute(
+            "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
+            ("Test Area Admin", "area@example.test", "password", "area_admin")
+        )
+        conn.commit()
+        conn.close()
+        self.set_user("area_admin", "area@example.test")
+        self.assertEqual(self.client.get("/area-admin").status_code, 200)
+        stylesheet = self.client.get("/static/style.css")
+        self.assertEqual(stylesheet.status_code, 200)
+        stylesheet.close()
 
     def create_assigned_report(self, status="Assigned"):
         conn = application.get_db()
@@ -457,12 +488,69 @@ class CleaningVerificationTests(unittest.TestCase):
         with open(os.path.join(destination_folder, "existing.jpg"), "wb") as image:
             image.write(b"persistent-version")
 
-        application.migrate_existing_uploads(source_folder, destination_folder)
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            results = list(executor.map(
+                lambda _: application.migrate_existing_uploads(
+                    source_folder,
+                    destination_folder
+                ),
+                range(8)
+            ))
+        self.assertEqual(results, [None] * 8)
 
         with open(os.path.join(destination_folder, "legacy.jpg"), "rb") as image:
             self.assertEqual(image.read(), JPEG_BYTES)
         with open(os.path.join(destination_folder, "existing.jpg"), "rb") as image:
             self.assertEqual(image.read(), b"persistent-version")
+
+    def test_database_initialization_is_safe_for_concurrent_workers(self):
+        database_path = os.path.join(self.temp_dir.name, "parallel.db")
+        original_database_path = application.DATABASE_PATH
+        original_get_db = application.get_db
+        application.DATABASE_PATH = database_path
+
+        def parallel_test_get_db():
+            conn = sqlite3.connect(database_path, timeout=30)
+            conn.row_factory = sqlite3.Row
+            return conn
+
+        application.get_db = parallel_test_get_db
+        try:
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                list(executor.map(
+                    lambda _: application.init_db(),
+                    range(8)
+                ))
+
+            conn = application.get_db()
+            report_columns = {
+                row["name"] for row in conn.execute("PRAGMA table_info(reports)")
+            }
+            users = conn.execute(
+                "SELECT email FROM users ORDER BY email"
+            ).fetchall()
+            conn.close()
+            self.assertTrue({
+                "assigned_category",
+                "after_photo",
+                "verification_status",
+            }.issubset(report_columns))
+            self.assertEqual(
+                {row["email"] for row in users},
+                {"admin@gmail.com", "staff@gmail.com"}
+            )
+        finally:
+            application.DATABASE_PATH = original_database_path
+            application.get_db = original_get_db
+
+    def test_gunicorn_uses_render_port_and_public_bind_address(self):
+        config_path = os.path.join(
+            os.path.dirname(application.__file__),
+            "gunicorn.conf.py"
+        )
+        with patch.dict(os.environ, {"PORT": "43123"}):
+            config = runpy.run_path(config_path)
+        self.assertEqual(config["bind"], "0.0.0.0:43123")
 
     def test_database_initialization_preserves_existing_admin_and_staff_passwords(self):
         conn = application.get_db()

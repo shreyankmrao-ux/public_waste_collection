@@ -18,6 +18,7 @@ import secrets
 import shutil
 import smtplib
 import ssl
+import tempfile
 from email.message import EmailMessage
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -51,6 +52,34 @@ os.makedirs(os.path.dirname(os.path.abspath(DATABASE_PATH)), exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
+def copy_file_if_missing(source, destination):
+    source_path = os.path.abspath(source)
+    destination_path = os.path.abspath(destination)
+    if source_path == destination_path or not os.path.isfile(source_path):
+        return False
+
+    destination_folder = os.path.dirname(destination_path)
+    os.makedirs(destination_folder, exist_ok=True)
+    if os.path.exists(destination_path):
+        return False
+
+    descriptor, temporary_path = tempfile.mkstemp(
+        prefix=".copy-",
+        dir=destination_folder
+    )
+    os.close(descriptor)
+    try:
+        shutil.copy2(source_path, temporary_path)
+        try:
+            os.link(temporary_path, destination_path)
+        except FileExistsError:
+            return False
+        return True
+    finally:
+        if os.path.exists(temporary_path):
+            os.remove(temporary_path)
+
+
 def migrate_existing_uploads(source_folder, destination_folder):
     if os.path.abspath(source_folder) == os.path.abspath(destination_folder):
         return
@@ -61,14 +90,13 @@ def migrate_existing_uploads(source_folder, destination_folder):
     for filename in os.listdir(source_folder):
         source = os.path.join(source_folder, filename)
         destination = os.path.join(destination_folder, filename)
-        if os.path.isfile(source) and not os.path.exists(destination):
-            shutil.copy2(source, destination)
+        if os.path.isfile(source):
+            copy_file_if_missing(source, destination)
 
 
 if DATA_DIR and not os.path.exists(DATABASE_PATH):
     bundled_database = os.path.join(PROJECT_DIR, "database.db")
-    if os.path.isfile(bundled_database):
-        shutil.copy2(bundled_database, DATABASE_PATH)
+    copy_file_if_missing(bundled_database, DATABASE_PATH)
 
 if DATA_DIR:
     legacy_upload_folder = os.path.join(PROJECT_DIR, "static", "uploads")
@@ -186,108 +214,103 @@ def save_uploaded_image(upload):
 def init_db():
 
     conn = get_db()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            role TEXT NOT NULL
-        )
-    """)
-
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS reports (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            location TEXT NOT NULL,
-            description TEXT NOT NULL,
-            photo TEXT,
-            status TEXT DEFAULT 'Pending',
-            assigned_to INTEGER,
-            created_at TEXT,
-            completed_at TEXT,
-            FOREIGN KEY(user_id) REFERENCES users(id),
-            FOREIGN KEY(assigned_to) REFERENCES users(id)
-        )
-    """)
-
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS ward_pincodes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pincode TEXT NOT NULL UNIQUE
-                CHECK (length(pincode) = 6 AND pincode NOT GLOB '*[^0-9]*'),
-            city TEXT NOT NULL,
-            ward_name TEXT NOT NULL,
-            added_by INTEGER NOT NULL,
-            FOREIGN KEY(added_by) REFERENCES users(id)
-        )
-    """)
-
-    report_columns = {
-        row["name"] for row in conn.execute("PRAGMA table_info(reports)")
-    }
-    if "assigned_category" not in report_columns:
-        conn.execute("ALTER TABLE reports ADD COLUMN assigned_category TEXT")
         conn.execute("""
-            UPDATE reports
-            SET assigned_category = (
-                SELECT name FROM users WHERE users.id = reports.assigned_to
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL
             )
-            WHERE assigned_to IS NOT NULL
-        """)
-        report_columns.add("assigned_category")
-    if "after_photo" not in report_columns:
-        conn.execute("ALTER TABLE reports ADD COLUMN after_photo TEXT")
-    if "verification_status" not in report_columns:
-        conn.execute("""
-            ALTER TABLE reports
-            ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'Awaiting Proof'
         """)
 
-    # DEFAULT ADMIN
-
-    admin = conn.execute(
-        "SELECT * FROM users WHERE email = ?",
-        ("admin@gmail.com",)
-    ).fetchone()
-
-    if admin is None:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                location TEXT NOT NULL,
+                description TEXT NOT NULL,
+                photo TEXT,
+                status TEXT DEFAULT 'Pending',
+                assigned_to INTEGER,
+                created_at TEXT,
+                completed_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id),
+                FOREIGN KEY(assigned_to) REFERENCES users(id)
+            )
+        """)
 
         conn.execute("""
-            INSERT INTO users
-            (name, email, password, role)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "System Admin",
-            "admin@gmail.com",
-            "admin@123",
-            "admin"
-        ))
+            CREATE TABLE IF NOT EXISTS ward_pincodes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pincode TEXT NOT NULL UNIQUE
+                    CHECK (length(pincode) = 6 AND pincode NOT GLOB '*[^0-9]*'),
+                city TEXT NOT NULL,
+                ward_name TEXT NOT NULL,
+                added_by INTEGER NOT NULL,
+                FOREIGN KEY(added_by) REFERENCES users(id)
+            )
+        """)
 
-    # DEFAULT PERSONNEL
+        report_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(reports)")
+        }
+        if "assigned_category" not in report_columns:
+            conn.execute("ALTER TABLE reports ADD COLUMN assigned_category TEXT")
+            conn.execute("""
+                UPDATE reports
+                SET assigned_category = (
+                    SELECT name FROM users WHERE users.id = reports.assigned_to
+                )
+                WHERE assigned_to IS NOT NULL
+            """)
+            report_columns.add("assigned_category")
+        if "after_photo" not in report_columns:
+            conn.execute("ALTER TABLE reports ADD COLUMN after_photo TEXT")
+        if "verification_status" not in report_columns:
+            conn.execute("""
+                ALTER TABLE reports
+                ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'Awaiting Proof'
+            """)
 
-    staff = conn.execute(
-        "SELECT * FROM users WHERE email = ?",
-        ("staff@gmail.com",)
-    ).fetchone()
+        admin = conn.execute(
+            "SELECT * FROM users WHERE email = ?",
+            ("admin@gmail.com",)
+        ).fetchone()
+        if admin is None:
+            conn.execute("""
+                INSERT INTO users
+                (name, email, password, role)
+                VALUES (?, ?, ?, ?)
+            """, (
+                "System Admin",
+                "admin@gmail.com",
+                "admin@123",
+                "admin"
+            ))
 
-    if staff is None:
+        staff = conn.execute(
+            "SELECT * FROM users WHERE email = ?",
+            ("staff@gmail.com",)
+        ).fetchone()
+        if staff is None:
+            conn.execute("""
+                INSERT INTO users
+                (name, email, password, role)
+                VALUES (?, ?, ?, ?)
+            """, (
+                "Waste Collection Staff",
+                "staff@gmail.com",
+                "staff@123",
+                "personnel"
+            ))
 
-        conn.execute("""
-            INSERT INTO users
-            (name, email, password, role)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "Waste Collection Staff",
-            "staff@gmail.com",
-            "staff@123",
-            "personnel"
-        ))
-
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
     
 
 init_db()
