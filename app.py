@@ -836,7 +836,7 @@ def admin_dashboard():
             users.name AS citizen_name,
             personnel.name AS personnel_name
         FROM reports
-        JOIN users
+        LEFT JOIN users
         ON reports.user_id = users.id
         LEFT JOIN users AS personnel
         ON reports.assigned_to = personnel.id
@@ -1003,7 +1003,7 @@ def personnel_dashboard():
             reports.*,
             users.name AS citizen_name
         FROM reports
-        JOIN users
+        LEFT JOIN users
         ON reports.user_id = users.id
         WHERE reports.assigned_to = ?
         ORDER BY reports.id DESC

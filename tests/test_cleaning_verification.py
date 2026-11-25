@@ -197,6 +197,37 @@ class CleaningVerificationTests(unittest.TestCase):
         self.assertEqual(verified["status"], "Completed")
         self.assertEqual(verified["verification_status"], "Verified by Admin")
 
+    def test_admin_and_assigned_staff_can_see_reports_without_citizen_rows(self):
+        staff_id = self.get_user_id("staff@gmail.com")
+        conn = application.get_db()
+        cursor = conn.execute("""
+            INSERT INTO reports
+                (user_id, location, description, status, assigned_to, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            999999,
+            "Legacy location",
+            "Report with missing citizen account",
+            "Assigned",
+            staff_id,
+            "2026-01-02 10:00:00"
+        ))
+        report_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        self.set_user("admin", "admin@gmail.com")
+        admin_dashboard = self.client.get("/admin")
+        self.assertEqual(admin_dashboard.status_code, 200)
+        self.assertIn(f"#{report_id}".encode(), admin_dashboard.data)
+        self.assertIn(b"Unknown citizen", admin_dashboard.data)
+
+        self.set_user("personnel", "staff@gmail.com")
+        personnel_dashboard = self.client.get("/personnel")
+        self.assertEqual(personnel_dashboard.status_code, 200)
+        self.assertIn(f"#{report_id}".encode(), personnel_dashboard.data)
+        self.assertIn(b"Unknown citizen", personnel_dashboard.data)
+
     def test_assignment_sends_staff_email_using_configured_smtp(self):
         report_id = self.create_assigned_report()
         self.set_user("admin", "admin@gmail.com")
