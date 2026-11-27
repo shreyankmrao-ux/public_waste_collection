@@ -180,6 +180,11 @@ class MongoPersistenceTests(unittest.TestCase):
         self.assertEqual(updated["status"], "Completed")
         self.assertEqual(updated["verification_status"], "Verified by Admin")
         self.assertTrue(updated["after_photo"])
+        admin_dashboard = self.client.get("/admin")
+        self.assertNotIn(
+            "/assign/{}".format(report["id"]).encode(),
+            admin_dashboard.data
+        )
 
     def test_staff_cannot_complete_without_photo_or_update_another_staff_report(self):
         report_id = self.create_assigned_report()
