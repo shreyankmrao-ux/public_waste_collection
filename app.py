@@ -16,163 +16,41 @@ import os
 import re
 import secrets
 import shutil
-import smtplib
-import ssl
-import tempfile
-from email.message import EmailMessage
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 import click
 
 app = Flask(__name__)
-
-REPORT_DISPLAY_TIMEZONE = timezone(timedelta(hours=5, minutes=30), "IST")
 
 app.secret_key = os.environ.get(
     "SECRET_KEY",
     "public_waste_collection_secret"
 )
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("DATA_DIR")
-CONFIGURED_DATABASE_PATH = os.environ.get("DATABASE_PATH")
-CONFIGURED_UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER")
-
-if DATA_DIR:
-    DATA_DIR = os.path.abspath(DATA_DIR)
-    DATABASE_PATH = os.path.join(DATA_DIR, "database.db")
-    UPLOAD_FOLDER = os.path.join(DATA_DIR, "uploads")
-else:
-    DATABASE_PATH = CONFIGURED_DATABASE_PATH or os.path.join(
-        PROJECT_DIR,
-        "database.db"
-    )
-    UPLOAD_FOLDER = CONFIGURED_UPLOAD_FOLDER or os.path.join(
-        PROJECT_DIR,
-        "static",
-        "uploads"
-    )
-
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE_PATH = os.environ.get(
+    "DATABASE_PATH",
+    os.path.join(DATA_DIR, "database.db")
+    if DATA_DIR
+    else os.path.join(PROJECT_DIR, "database.db")
+)
+UPLOAD_FOLDER = os.environ.get(
+    "UPLOAD_FOLDER",
+    os.path.join(DATA_DIR, "uploads")
+    if DATA_DIR
+    else os.path.join(PROJECT_DIR, "static", "uploads")
+)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
-
-def copy_file_if_missing(source, destination):
-    source_path = os.path.abspath(source)
-    destination_path = os.path.abspath(destination)
-    if source_path == destination_path or not os.path.isfile(source_path):
-        return False
-
-    destination_folder = os.path.dirname(destination_path)
-    os.makedirs(destination_folder, exist_ok=True)
-    if os.path.exists(destination_path):
-        return False
-
-    descriptor, temporary_path = tempfile.mkstemp(
-        prefix=".copy-",
-        dir=destination_folder
-    )
-    os.close(descriptor)
-    try:
-        shutil.copy2(source_path, temporary_path)
-        try:
-            os.link(temporary_path, destination_path)
-        except FileExistsError:
-            return False
-        return True
-    finally:
-        if os.path.exists(temporary_path):
-            os.remove(temporary_path)
-
-
-def migrate_existing_database(source_path, destination_path):
-    source_path = os.path.abspath(source_path)
-    destination_path = os.path.abspath(destination_path)
-    if (
-        source_path == destination_path
-        or not os.path.isfile(source_path)
-        or os.path.exists(destination_path)
-    ):
-        return False
-
-    destination_folder = os.path.dirname(destination_path)
-    os.makedirs(destination_folder, exist_ok=True)
-    descriptor, temporary_path = tempfile.mkstemp(
-        prefix=".database-",
-        suffix=".db",
-        dir=destination_folder
-    )
-    os.close(descriptor)
-    try:
-        source = sqlite3.connect(source_path)
-        destination = sqlite3.connect(temporary_path)
-        try:
-            tables = {
-                row[0] for row in source.execute(
-                    "SELECT name FROM sqlite_master WHERE type = 'table'"
-                )
-            }
-            application_tables = {"users", "reports"}.intersection(tables)
-            if not application_tables or not any(
-                source.execute(
-                    f'SELECT 1 FROM "{table}" LIMIT 1'
-                ).fetchone()
-                for table in application_tables
-            ):
-                return False
-            source.backup(destination)
-        finally:
-            destination.close()
-            source.close()
-
-        try:
-            os.link(temporary_path, destination_path)
-        except FileExistsError:
-            return False
-        return True
-    finally:
-        if os.path.exists(temporary_path):
-            os.remove(temporary_path)
-
-
-def migrate_existing_uploads(source_folder, destination_folder):
-    if os.path.abspath(source_folder) == os.path.abspath(destination_folder):
-        return
-
-    if not os.path.isdir(source_folder):
-        return
-
-    for filename in os.listdir(source_folder):
-        source = os.path.join(source_folder, filename)
-        destination = os.path.join(destination_folder, filename)
-        if os.path.isfile(source):
-            copy_file_if_missing(source, destination)
-
 
 os.makedirs(os.path.dirname(os.path.abspath(DATABASE_PATH)), exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-if DATA_DIR:
-    legacy_database_paths = (
-        CONFIGURED_DATABASE_PATH,
-        os.path.join(PROJECT_DIR, "database.db"),
-    )
-    for legacy_database_path in legacy_database_paths:
-        if os.path.exists(DATABASE_PATH):
-            break
-        if legacy_database_path:
-            migrate_existing_database(
-                legacy_database_path,
-                DATABASE_PATH
-            )
-
-    legacy_upload_folders = (
-        CONFIGURED_UPLOAD_FOLDER,
-        os.path.join(PROJECT_DIR, "static", "uploads"),
-    )
-    for legacy_upload_folder in legacy_upload_folders:
-        if legacy_upload_folder:
-            migrate_existing_uploads(legacy_upload_folder, UPLOAD_FOLDER)
+if DATA_DIR and not os.path.exists(DATABASE_PATH):
+    bundled_database = os.path.join(PROJECT_DIR, "database.db")
+    if os.path.isfile(bundled_database):
+        shutil.copy2(bundled_database, DATABASE_PATH)
 
 STAFF_CATEGORIES = (
     "Waste Collection Staff",
@@ -181,18 +59,6 @@ STAFF_CATEGORIES = (
     "Waste Disposal Staff",
 )
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
-EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-
-
-def normalize_email(value):
-    if not isinstance(value, str):
-        return ""
-    return value.strip().lower()
-
-
-def is_valid_email(value):
-    email = normalize_email(value)
-    return bool(email and EMAIL_PATTERN.fullmatch(email))
 
 
 # =========================================================
@@ -203,89 +69,6 @@ def get_db():
     conn = sqlite3.connect(DATABASE_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     return conn
-
-
-@app.template_filter("local_datetime")
-def local_datetime(value):
-    if not value:
-        return "—"
-
-    try:
-        parsed = datetime.fromisoformat(value)
-    except (TypeError, ValueError):
-        return value
-
-    if parsed.tzinfo is None:
-        parsed = parsed.astimezone()
-
-    return parsed.astimezone(REPORT_DISPLAY_TIMEZONE).strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
-
-def send_assignment_email(recipient, report_id, location, description):
-    settings = {
-        "SMTP_HOST": os.environ.get("SMTP_HOST", "").strip(),
-        "SMTP_USERNAME": os.environ.get("SMTP_USERNAME", "").strip(),
-        "SMTP_PASSWORD": os.environ.get("SMTP_PASSWORD", ""),
-        "MAIL_FROM": os.environ.get("MAIL_FROM", "").strip(),
-    }
-    missing_settings = [
-        key for key, value in settings.items() if not value
-    ]
-    if missing_settings:
-        app.logger.warning(
-            "Assignment email not sent; missing Render environment variables: %s",
-            ", ".join(missing_settings)
-        )
-        return False
-
-    try:
-        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-        use_ssl = os.environ.get(
-            "SMTP_USE_SSL",
-            "false"
-        ).strip().lower() in {"1", "true", "yes"}
-        message = EmailMessage()
-        message["Subject"] = f"Waste collection report #{report_id} assigned"
-        message["From"] = settings["MAIL_FROM"]
-        message["To"] = recipient
-        message.set_content(
-            "A waste collection report has been assigned to you.\n\n"
-            f"Report: #{report_id}\n"
-            f"Location: {location}\n"
-            f"Description: {description}\n"
-        )
-
-        if use_ssl:
-            smtp_client = smtplib.SMTP_SSL(
-                settings["SMTP_HOST"],
-                smtp_port,
-                timeout=15,
-                context=ssl.create_default_context()
-            )
-        else:
-            smtp_client = smtplib.SMTP(
-                settings["SMTP_HOST"],
-                smtp_port,
-                timeout=15
-            )
-
-        with smtp_client as smtp:
-            smtp.ehlo()
-            if not use_ssl:
-                smtp.starttls(context=ssl.create_default_context())
-                smtp.ehlo()
-            smtp.login(
-                settings["SMTP_USERNAME"],
-                settings["SMTP_PASSWORD"]
-            )
-            smtp.send_message(message)
-    except (OSError, smtplib.SMTPException, ValueError):
-        app.logger.exception("Failed to send staff assignment email")
-        return False
-
-    return True
 
 
 def save_uploaded_image(upload):
@@ -316,108 +99,109 @@ def save_uploaded_image(upload):
 def init_db():
 
     conn = get_db()
-    try:
-        conn.execute("BEGIN IMMEDIATE")
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            location TEXT NOT NULL,
+            description TEXT NOT NULL,
+            photo TEXT,
+            status TEXT DEFAULT 'Pending',
+            assigned_to INTEGER,
+            created_at TEXT,
+            completed_at TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(assigned_to) REFERENCES users(id)
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ward_pincodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pincode TEXT NOT NULL UNIQUE
+                CHECK (length(pincode) = 6 AND pincode NOT GLOB '*[^0-9]*'),
+            city TEXT NOT NULL,
+            ward_name TEXT NOT NULL,
+            added_by INTEGER NOT NULL,
+            FOREIGN KEY(added_by) REFERENCES users(id)
+        )
+    """)
+
+    report_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(reports)")
+    }
+    if "assigned_category" not in report_columns:
+        conn.execute("ALTER TABLE reports ADD COLUMN assigned_category TEXT")
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                role TEXT NOT NULL
+            UPDATE reports
+            SET assigned_category = (
+                SELECT name FROM users WHERE users.id = reports.assigned_to
             )
+            WHERE assigned_to IS NOT NULL
+        """)
+        report_columns.add("assigned_category")
+    if "after_photo" not in report_columns:
+        conn.execute("ALTER TABLE reports ADD COLUMN after_photo TEXT")
+    if "verification_status" not in report_columns:
+        conn.execute("""
+            ALTER TABLE reports
+            ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'Awaiting Proof'
         """)
 
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS reports (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                location TEXT NOT NULL,
-                description TEXT NOT NULL,
-                photo TEXT,
-                status TEXT DEFAULT 'Pending',
-                assigned_to INTEGER,
-                created_at TEXT,
-                completed_at TEXT,
-                FOREIGN KEY(user_id) REFERENCES users(id),
-                FOREIGN KEY(assigned_to) REFERENCES users(id)
-            )
-        """)
+    # DEFAULT ADMIN
+
+    admin = conn.execute(
+        "SELECT * FROM users WHERE email = ?",
+        ("admin@gmail.com",)
+    ).fetchone()
+
+    if admin is None:
 
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS ward_pincodes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pincode TEXT NOT NULL UNIQUE
-                    CHECK (length(pincode) = 6 AND pincode NOT GLOB '*[^0-9]*'),
-                city TEXT NOT NULL,
-                ward_name TEXT NOT NULL,
-                added_by INTEGER NOT NULL,
-                FOREIGN KEY(added_by) REFERENCES users(id)
-            )
-        """)
+            INSERT INTO users
+            (name, email, password, role)
+            VALUES (?, ?, ?, ?)
+        """, (
+            "System Admin",
+            "admin@gmail.com",
+            "admin@123",
+            "admin"
+        ))
 
-        report_columns = {
-            row["name"] for row in conn.execute("PRAGMA table_info(reports)")
-        }
-        if "assigned_category" not in report_columns:
-            conn.execute("ALTER TABLE reports ADD COLUMN assigned_category TEXT")
-            conn.execute("""
-                UPDATE reports
-                SET assigned_category = (
-                    SELECT name FROM users WHERE users.id = reports.assigned_to
-                )
-                WHERE assigned_to IS NOT NULL
-            """)
-            report_columns.add("assigned_category")
-        if "after_photo" not in report_columns:
-            conn.execute("ALTER TABLE reports ADD COLUMN after_photo TEXT")
-        if "verification_status" not in report_columns:
-            conn.execute("""
-                ALTER TABLE reports
-                ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'Awaiting Proof'
-            """)
+    # DEFAULT PERSONNEL
 
+    staff = conn.execute(
+        "SELECT * FROM users WHERE email = ?",
+        ("staff@gmail.com",)
+    ).fetchone()
 
-        admin = conn.execute(
-            "SELECT * FROM users WHERE email = ?",
-            ("admin@gmail.com",)
-        ).fetchone()
-        if admin is None:
-            conn.execute("""
-                INSERT INTO users
-                (name, email, password, role)
-                VALUES (?, ?, ?, ?)
-            """, (
-                "System Admin",
-                "admin@gmail.com",
-                "admin@123",
-                "admin"
-            ))
+    if staff is None:
 
-        staff = conn.execute(
-            "SELECT * FROM users WHERE email = ?",
-            ("staff@gmail.com",)
-        ).fetchone()
-        if staff is None:
-            conn.execute("""
-                INSERT INTO users
-                (name, email, password, role)
-                VALUES (?, ?, ?, ?)
-            """, (
-                "Waste Collection Staff",
-                "staff@gmail.com",
-                "staff@123",
-                "personnel"
-            ))
+        conn.execute("""
+            INSERT INTO users
+            (name, email, password, role)
+            VALUES (?, ?, ?, ?)
+        """, (
+            "Waste Collection Staff",
+            "staff@gmail.com",
+            "staff@123",
+            "personnel"
+        ))
 
-        conn.commit()
-    finally:
-        conn.close()
+    conn.commit()
+    conn.close()
     
-
-init_db()
-
 
 @app.cli.command("area-admin-setup")
 def area_admin_setup():
@@ -525,12 +309,8 @@ def register():
     if request.method == "POST":
 
         name = request.form["name"]
-        email = normalize_email(request.form["email"])
+        email = request.form["email"].strip().lower()
         password = request.form["password"]
-
-        if not is_valid_email(email):
-            flash("Enter a valid email address.")
-            return redirect(url_for("register"))
 
         conn = get_db()
 
@@ -543,7 +323,7 @@ def register():
             """, (
                 name,
                 email,
-                generate_password_hash(password),
+                password,
                 "citizen"
             ))
 
@@ -571,52 +351,34 @@ def login():
 
     if request.method == "POST":
 
-        identifier = normalize_email(
-            request.form.get(
-                "username",
-                request.form.get(
-                    "identifier",
-                    request.form.get("email", "")
-                )
-            )
-        )
-        password = request.form.get("password", "")
-
-        if not identifier or not password:
-            flash("Invalid email or password.")
-            return render_template("login.html")
+        email = request.form["email"].strip().lower()
+        password = request.form["password"]
 
         conn = get_db()
 
-        users = conn.execute("""
+        user = conn.execute("""
             SELECT *
             FROM users
-            WHERE lower(email) = ? OR lower(name) = ?
+            WHERE lower(email) = ?
         """, (
-            identifier,
-            identifier,
-        )).fetchall()
+            email,
+        )).fetchone()
 
         conn.close()
 
-        user = None
-        for candidate in users:
-            password_matches = False
-            if candidate:
-                stored_password = candidate["password"]
-                if stored_password.startswith(("scrypt:", "pbkdf2:")):
-                    password_matches = check_password_hash(
-                        stored_password,
-                        password
-                    )
-                else:
-                    password_matches = stored_password == password
-
-            if password_matches:
-                user = candidate
-                break
-
+        password_matches = False
         if user:
+            stored_password = user["password"]
+            if stored_password.startswith(("scrypt:", "pbkdf2:")):
+                password_matches = check_password_hash(
+                    stored_password,
+                    password
+                )
+            else:
+                password_matches = stored_password == password
+
+        if user and password_matches:
+
             session["user_id"] = user["id"]
             session["name"] = user["name"]
             session["role"] = user["role"]
@@ -984,7 +746,7 @@ def admin_dashboard():
             users.name AS citizen_name,
             personnel.name AS personnel_name
         FROM reports
-        LEFT JOIN users
+        JOIN users
         ON reports.user_id = users.id
         LEFT JOIN users AS personnel
         ON reports.assigned_to = personnel.id
@@ -1038,7 +800,7 @@ def assign(report_id):
     selected_staff = request.form.get("personnel_id", "")
     if selected_staff in STAFF_CATEGORIES:
         personnel = conn.execute("""
-            SELECT id, name, email
+            SELECT id
             FROM users
             WHERE role = 'personnel' AND name = ?
             ORDER BY id
@@ -1047,7 +809,7 @@ def assign(report_id):
 
         if personnel is None:
             personnel = conn.execute("""
-                SELECT id, name, email
+                SELECT id
                 FROM users
                 WHERE role = 'personnel'
                 ORDER BY CASE WHEN name = 'Waste Collection Staff' THEN 0 ELSE 1 END, id
@@ -1070,7 +832,7 @@ def assign(report_id):
             return redirect(url_for("admin_dashboard"))
 
         personnel = conn.execute("""
-            SELECT id, name, email
+            SELECT id, name
             FROM users
             WHERE id = ? AND role = 'personnel'
         """, (personnel_id,)).fetchone()
@@ -1080,16 +842,6 @@ def assign(report_id):
             return redirect(url_for("admin_dashboard"))
 
         assigned_category = personnel["name"]
-
-    report = conn.execute("""
-        SELECT location, description
-        FROM reports
-        WHERE id = ?
-    """, (report_id,)).fetchone()
-    if report is None:
-        conn.close()
-        flash("The report could not be found.")
-        return redirect(url_for("admin_dashboard"))
 
     conn.execute("""
         UPDATE reports
@@ -1112,21 +864,6 @@ def assign(report_id):
 
     conn.commit()
     conn.close()
-
-    email_sent = send_assignment_email(
-        personnel["email"],
-        report_id,
-        report["location"],
-        report["description"]
-    )
-    if email_sent:
-        flash("Report assigned and staff notification email sent.", "success")
-    else:
-        flash(
-            "Report assigned, but the staff notification email was not sent. "
-            "Check the SMTP environment variables and Render logs.",
-            "warning"
-        )
 
     return redirect(
         url_for("admin_dashboard")
@@ -1151,7 +888,7 @@ def personnel_dashboard():
             reports.*,
             users.name AS citizen_name
         FROM reports
-        LEFT JOIN users
+        JOIN users
         ON reports.user_id = users.id
         WHERE reports.assigned_to = ?
         ORDER BY reports.id DESC
@@ -1304,11 +1041,13 @@ def verify_cleaning(report_id):
 
 
 if __name__ == "__main__":
+    init_db()
+
     Timer(
         1.5,
         lambda: webbrowser.open("http://127.0.0.1:5000/")
     ).start()
 
-    app.run(debug=True, use_reloader=False)
+    app.run(debug=True)
 
    
