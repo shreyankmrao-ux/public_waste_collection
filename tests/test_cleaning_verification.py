@@ -476,6 +476,146 @@ class CleaningVerificationTests(unittest.TestCase):
             application.check_password_hash(user["password"], "new-password")
         )
 
+        response = self.client.post("/login", data={
+            "email": "new.user@example.test",
+            "password": "new-password"
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/dashboard")
+        with self.client.session_transaction() as session:
+            self.assertEqual(session["role"], "citizen")
+
+    def test_registered_account_survives_logout_and_logs_in_with_name(self):
+        response = self.client.post("/register", data={
+            "name": "Persistent Citizen",
+            "email": "persistent@example.test",
+            "password": "persistent-password"
+        })
+        self.assertEqual(response.status_code, 302)
+
+        response = self.client.get("/logout")
+        self.assertEqual(response.status_code, 302)
+        with self.client.session_transaction() as session:
+            self.assertNotIn("user_id", session)
+
+        conn = application.get_db()
+        user = conn.execute(
+            "SELECT password FROM users WHERE email = ?",
+            ("persistent@example.test",)
+        ).fetchone()
+        conn.close()
+        self.assertIsNotNone(user)
+        self.assertTrue(
+            application.check_password_hash(
+                user["password"],
+                "persistent-password"
+            )
+        )
+
+        response = self.client.post("/login", data={
+            "username": "  PERSISTENT CITIZEN  ",
+            "password": "persistent-password"
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/dashboard")
+        with self.client.session_transaction() as session:
+            self.assertEqual(session["name"], "Persistent Citizen")
+            self.assertEqual(session["role"], "citizen")
+
+    def test_existing_database_migration_preserves_users_and_reports(self):
+        source_path = os.path.join(self.temp_dir.name, "legacy.db")
+        destination_path = os.path.join(self.temp_dir.name, "persistent", "database.db")
+        conn = sqlite3.connect(source_path)
+        conn.executescript("""
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL
+            );
+            CREATE TABLE reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                location TEXT NOT NULL,
+                description TEXT NOT NULL,
+                photo TEXT,
+                status TEXT DEFAULT 'Pending',
+                assigned_to INTEGER,
+                created_at TEXT,
+                completed_at TEXT
+            );
+        """)
+        password_hash = application.generate_password_hash("preserved-password")
+        conn.execute(
+            "INSERT INTO users VALUES (?, ?, ?, ?, ?)",
+            (17, "Legacy Citizen", "legacy@example.test", password_hash, "citizen")
+        )
+        conn.execute("""
+            INSERT INTO reports
+                (id, user_id, location, description, photo, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (29, 17, "Legacy location", "Legacy report", "legacy.jpg", "Pending"))
+        conn.commit()
+        conn.close()
+
+        self.assertTrue(
+            application.migrate_existing_database(source_path, destination_path)
+        )
+
+        conn = sqlite3.connect(destination_path)
+        user = conn.execute(
+            "SELECT name, email, password, role FROM users WHERE id = 17"
+        ).fetchone()
+        report = conn.execute(
+            "SELECT user_id, location, description, photo, status FROM reports WHERE id = 29"
+        ).fetchone()
+        conn.execute(
+            "UPDATE users SET name = ? WHERE id = 17",
+            ("Persistent Citizen",)
+        )
+        conn.commit()
+        conn.close()
+
+        self.assertEqual(
+            user,
+            ("Legacy Citizen", "legacy@example.test", password_hash, "citizen")
+        )
+        self.assertEqual(
+            report,
+            (17, "Legacy location", "Legacy report", "legacy.jpg", "Pending")
+        )
+        self.assertFalse(
+            application.migrate_existing_database(source_path, destination_path)
+        )
+        conn = sqlite3.connect(destination_path)
+        persistent_name = conn.execute(
+            "SELECT name FROM users WHERE id = 17"
+        ).fetchone()[0]
+        conn.close()
+        self.assertEqual(persistent_name, "Persistent Citizen")
+
+    def test_empty_legacy_database_is_not_migrated_over_existing_data(self):
+        source_path = os.path.join(self.temp_dir.name, "empty-legacy.db")
+        destination_path = os.path.join(self.temp_dir.name, "persistent", "database.db")
+        conn = sqlite3.connect(source_path)
+        conn.execute("""
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT,
+                email TEXT,
+                password TEXT,
+                role TEXT
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+        self.assertFalse(
+            application.migrate_existing_database(source_path, destination_path)
+        )
+        self.assertFalse(os.path.exists(destination_path))
+
     def test_existing_uploads_are_migrated_without_overwriting_disk_files(self):
         source_folder = os.path.join(self.temp_dir.name, "legacy-uploads")
         destination_folder = os.path.join(self.temp_dir.name, "persistent-uploads")
@@ -719,8 +859,8 @@ class CleaningVerificationTests(unittest.TestCase):
         self.set_user("admin", "admin@gmail.com")
         admin_dashboard = self.client.get("/admin")
         self.assertEqual(admin_dashboard.status_code, 200)
-        self.assertIn(b"<td>#1</td>", admin_dashboard.data)
-        self.assertIn(b"<td>#2</td>", admin_dashboard.data)
+        self.assertIn(b'<td data-label="ID">#1</td>', admin_dashboard.data)
+        self.assertIn(b'<td data-label="ID">#2</td>', admin_dashboard.data)
 
         self.set_user("personnel", "staff@gmail.com")
         personnel_dashboard = self.client.get("/personnel")

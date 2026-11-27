@@ -50,13 +50,13 @@
                     <tbody>
                         {% for report in reports %}
                             <tr>
-                                <td>#{{ loop.index }}</td>
-                                <td>{{ report.citizen_name or 'Unknown citizen' }}</td>
-                                <td>{{ report.location }}</td>
-                                <td>{{ report.description }}</td>
-                                <td>{{ report.created_at|local_datetime }}</td>
-                                <td>{{ report.completed_at|local_datetime }}</td>
-                                <td>
+                                <td data-label="ID">#{{ loop.index }}</td>
+                                <td data-label="Citizen">{{ report.citizen_name or 'Unknown citizen' }}</td>
+                                <td data-label="Location">{{ report.location }}</td>
+                                <td data-label="Description">{{ report.description }}</td>
+                                <td data-label="Reported">{{ report.created_at|local_datetime }}</td>
+                                <td data-label="Completed">{{ report.completed_at|local_datetime }}</td>
+                                <td data-label="Photo">
                                     {% if report.photo %}
                                         <a href="{{ url_for('uploaded_file', filename=report.photo) }}" target="_blank" rel="noopener">
                                             <img src="{{ url_for('uploaded_file', filename=report.photo) }}" class="report-image admin-report-image" alt="Waste reported for #{{ loop.index }}" loading="lazy">
@@ -65,7 +65,7 @@
                                         <span class="photo-empty">No photo</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td data-label="After cleaning">
                                     {% if report.after_photo %}
                                         <a href="{{ url_for('uploaded_file', filename=report.after_photo) }}" target="_blank" rel="noopener">
                                             <img src="{{ url_for('uploaded_file', filename=report.after_photo) }}" class="report-image admin-report-image" alt="After cleaning proof for #{{ loop.index }}" loading="lazy">
@@ -74,9 +74,9 @@
                                         <span class="photo-empty">Awaiting Cleaning Proof</span>
                                     {% endif %}
                                 </td>
-                                <td><span class="status">{{ report.status }}</span></td>
-                                <td>{{ report.assigned_category or report.personnel_name or 'Not assigned' }}</td>
-                                <td>
+                                <td data-label="Status"><span class="status">{{ report.status }}</span></td>
+                                <td data-label="Assigned staff">{{ report.assigned_category or report.personnel_name or 'Not assigned' }}</td>
+                                <td data-label="Assign personnel">
                                     <form class="inline-form" method="post" action="{{ url_for('assign', report_id=report.id) }}">
                                         <select name="personnel_id" required>
                                             <option value="">Choose staff</option>

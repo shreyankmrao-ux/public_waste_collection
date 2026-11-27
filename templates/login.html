@@ -19,7 +19,7 @@
 
         <span class="eyebrow">PUBLIC WASTE COLLECTION MONITORING</span>
         <h2>Sign In</h2>
-        <p>Use your registered email and password. Your dashboard will open automatically.</p>
+        <p>Use the full name or email address you registered with and your password. Your dashboard will open automatically.</p>
 
         {% with messages = get_flashed_messages() %}
             {% for message in messages %}
@@ -28,8 +28,8 @@
         {% endwith %}
 
         <form method="POST">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" autocomplete="username" required>
+            <label for="username">Username or email</label>
+            <input type="text" id="username" name="username" autocomplete="username" required>
 
             <label for="password">Password</label>
             <input type="password" id="password" name="password" autocomplete="current-password" required>

@@ -81,10 +81,17 @@
                                 <img
                                     src="{{ url_for('uploaded_file', filename=report.after_photo) }}"
                                     class="report-image"
-                                    alt="After cleaning proof for report #{{ loop.index }}">
+                                    alt="After cleaning proof for report #{{ loop.index }}"
+                                    loading="lazy">
                             </a>
                             {% else %}
-                            <span class="photo-empty">Awaiting Cleaning Proof</span>
+                            <span class="photo-empty">
+                                {% if report.status == 'Completed' %}
+                                No after-cleaning photo was retained
+                                {% else %}
+                                Awaiting Cleaning Proof
+                                {% endif %}
+                            </span>
                             {% endif %}
                         </td>
                     </tr>

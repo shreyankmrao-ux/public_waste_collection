@@ -34,24 +34,27 @@ app.secret_key = os.environ.get(
     "public_waste_collection_secret"
 )
 
-DATA_DIR = os.environ.get("DATA_DIR")
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_PATH = os.environ.get(
-    "DATABASE_PATH",
-    os.path.join(DATA_DIR, "database.db")
-    if DATA_DIR
-    else os.path.join(PROJECT_DIR, "database.db")
-)
-UPLOAD_FOLDER = os.environ.get(
-    "UPLOAD_FOLDER",
-    os.path.join(DATA_DIR, "uploads")
-    if DATA_DIR
-    else os.path.join(PROJECT_DIR, "static", "uploads")
-)
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+DATA_DIR = os.environ.get("DATA_DIR")
+CONFIGURED_DATABASE_PATH = os.environ.get("DATABASE_PATH")
+CONFIGURED_UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER")
 
-os.makedirs(os.path.dirname(os.path.abspath(DATABASE_PATH)), exist_ok=True)
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+if DATA_DIR:
+    DATA_DIR = os.path.abspath(DATA_DIR)
+    DATABASE_PATH = os.path.join(DATA_DIR, "database.db")
+    UPLOAD_FOLDER = os.path.join(DATA_DIR, "uploads")
+else:
+    DATABASE_PATH = CONFIGURED_DATABASE_PATH or os.path.join(
+        PROJECT_DIR,
+        "database.db"
+    )
+    UPLOAD_FOLDER = CONFIGURED_UPLOAD_FOLDER or os.path.join(
+        PROJECT_DIR,
+        "static",
+        "uploads"
+    )
+
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 
 def copy_file_if_missing(source, destination):
@@ -82,6 +85,56 @@ def copy_file_if_missing(source, destination):
             os.remove(temporary_path)
 
 
+def migrate_existing_database(source_path, destination_path):
+    source_path = os.path.abspath(source_path)
+    destination_path = os.path.abspath(destination_path)
+    if (
+        source_path == destination_path
+        or not os.path.isfile(source_path)
+        or os.path.exists(destination_path)
+    ):
+        return False
+
+    destination_folder = os.path.dirname(destination_path)
+    os.makedirs(destination_folder, exist_ok=True)
+    descriptor, temporary_path = tempfile.mkstemp(
+        prefix=".database-",
+        suffix=".db",
+        dir=destination_folder
+    )
+    os.close(descriptor)
+    try:
+        source = sqlite3.connect(source_path)
+        destination = sqlite3.connect(temporary_path)
+        try:
+            tables = {
+                row[0] for row in source.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            }
+            application_tables = {"users", "reports"}.intersection(tables)
+            if not application_tables or not any(
+                source.execute(
+                    f'SELECT 1 FROM "{table}" LIMIT 1'
+                ).fetchone()
+                for table in application_tables
+            ):
+                return False
+            source.backup(destination)
+        finally:
+            destination.close()
+            source.close()
+
+        try:
+            os.link(temporary_path, destination_path)
+        except FileExistsError:
+            return False
+        return True
+    finally:
+        if os.path.exists(temporary_path):
+            os.remove(temporary_path)
+
+
 def migrate_existing_uploads(source_folder, destination_folder):
     if os.path.abspath(source_folder) == os.path.abspath(destination_folder):
         return
@@ -96,13 +149,30 @@ def migrate_existing_uploads(source_folder, destination_folder):
             copy_file_if_missing(source, destination)
 
 
-if DATA_DIR and not os.path.exists(DATABASE_PATH):
-    bundled_database = os.path.join(PROJECT_DIR, "database.db")
-    copy_file_if_missing(bundled_database, DATABASE_PATH)
+os.makedirs(os.path.dirname(os.path.abspath(DATABASE_PATH)), exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 if DATA_DIR:
-    legacy_upload_folder = os.path.join(PROJECT_DIR, "static", "uploads")
-    migrate_existing_uploads(legacy_upload_folder, UPLOAD_FOLDER)
+    legacy_database_paths = (
+        CONFIGURED_DATABASE_PATH,
+        os.path.join(PROJECT_DIR, "database.db"),
+    )
+    for legacy_database_path in legacy_database_paths:
+        if os.path.exists(DATABASE_PATH):
+            break
+        if legacy_database_path:
+            migrate_existing_database(
+                legacy_database_path,
+                DATABASE_PATH
+            )
+
+    legacy_upload_folders = (
+        CONFIGURED_UPLOAD_FOLDER,
+        os.path.join(PROJECT_DIR, "static", "uploads"),
+    )
+    for legacy_upload_folder in legacy_upload_folders:
+        if legacy_upload_folder:
+            migrate_existing_uploads(legacy_upload_folder, UPLOAD_FOLDER)
 
 STAFF_CATEGORIES = (
     "Waste Collection Staff",
@@ -111,6 +181,18 @@ STAFF_CATEGORIES = (
     "Waste Disposal Staff",
 )
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def normalize_email(value):
+    if not isinstance(value, str):
+        return ""
+    return value.strip().lower()
+
+
+def is_valid_email(value):
+    email = normalize_email(value)
+    return bool(email and EMAIL_PATTERN.fullmatch(email))
 
 
 # =========================================================
@@ -296,6 +378,7 @@ def init_db():
                 ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'Awaiting Proof'
             """)
 
+
         admin = conn.execute(
             "SELECT * FROM users WHERE email = ?",
             ("admin@gmail.com",)
@@ -442,8 +525,12 @@ def register():
     if request.method == "POST":
 
         name = request.form["name"]
-        email = request.form["email"].strip().lower()
+        email = normalize_email(request.form["email"])
         password = request.form["password"]
+
+        if not is_valid_email(email):
+            flash("Enter a valid email address.")
+            return redirect(url_for("register"))
 
         conn = get_db()
 
@@ -484,34 +571,52 @@ def login():
 
     if request.method == "POST":
 
-        email = request.form["email"].strip().lower()
-        password = request.form["password"]
+        identifier = normalize_email(
+            request.form.get(
+                "username",
+                request.form.get(
+                    "identifier",
+                    request.form.get("email", "")
+                )
+            )
+        )
+        password = request.form.get("password", "")
+
+        if not identifier or not password:
+            flash("Invalid email or password.")
+            return render_template("login.html")
 
         conn = get_db()
 
-        user = conn.execute("""
+        users = conn.execute("""
             SELECT *
             FROM users
-            WHERE lower(email) = ?
+            WHERE lower(email) = ? OR lower(name) = ?
         """, (
-            email,
-        )).fetchone()
+            identifier,
+            identifier,
+        )).fetchall()
 
         conn.close()
 
-        password_matches = False
+        user = None
+        for candidate in users:
+            password_matches = False
+            if candidate:
+                stored_password = candidate["password"]
+                if stored_password.startswith(("scrypt:", "pbkdf2:")):
+                    password_matches = check_password_hash(
+                        stored_password,
+                        password
+                    )
+                else:
+                    password_matches = stored_password == password
+
+            if password_matches:
+                user = candidate
+                break
+
         if user:
-            stored_password = user["password"]
-            if stored_password.startswith(("scrypt:", "pbkdf2:")):
-                password_matches = check_password_hash(
-                    stored_password,
-                    password
-                )
-            else:
-                password_matches = stored_password == password
-
-        if user and password_matches:
-
             session["user_id"] = user["id"]
             session["name"] = user["name"]
             session["role"] = user["role"]
@@ -1204,6 +1309,6 @@ if __name__ == "__main__":
         lambda: webbrowser.open("http://127.0.0.1:5000/")
     ).start()
 
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
 
    
