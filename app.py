@@ -341,7 +341,7 @@ def register():
             """, (
                 name,
                 email,
-                password,
+                generate_password_hash(password),
                 "citizen"
             ))
 
@@ -450,6 +450,38 @@ def logout():
     session.clear()
 
     return redirect(url_for("index"))
+
+
+@app.route("/admin/reset-citizen-password", methods=["POST"])
+def reset_citizen_password():
+    if session.get("role") != "admin":
+        return redirect(url_for("login"))
+
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("new_password", "")
+    confirm_password = request.form.get("confirm_password", "")
+
+    if password != confirm_password:
+        flash("The new passwords do not match.", "error")
+        return redirect(url_for("admin_dashboard"))
+    if len(password) < 8:
+        flash("Use at least 8 characters for the new password.", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    conn = get_db()
+    result = conn.execute("""
+        UPDATE users
+        SET password = ?
+        WHERE lower(email) = ? AND role = 'citizen'
+    """, (generate_password_hash(password), email))
+    conn.commit()
+    conn.close()
+
+    if result.rowcount:
+        flash("Citizen password reset. Sign in with the new password.", "success")
+    else:
+        flash("No citizen account was found with that email.", "error")
+    return redirect(url_for("admin_dashboard"))
 
 
 @app.route("/area_admin_login", methods=["GET", "POST"])

@@ -27,13 +27,13 @@
             {% endfor %}
         {% endwith %}
 
-        <form method="POST">
+        <form method="POST" autocomplete="off">
             <label for="username">Username or email</label>
-            <input type="text" id="username" name="username" autocomplete="username" required>
+            <input type="text" id="username" name="username" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" required>
 
             <label for="password">Password</label>
             <div class="password-field">
-                <input type="password" id="password" name="password" autocomplete="current-password" required>
+                <input type="password" id="password" name="password" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" required>
                 <button class="password-toggle" type="button" aria-controls="password" aria-pressed="false">Show</button>
             </div>
 

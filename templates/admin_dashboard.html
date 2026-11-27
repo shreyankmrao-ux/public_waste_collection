@@ -104,6 +104,20 @@
                 <p>No location data yet.</p>
             {% endfor %}
         </section>
+
+        <section class="panel">
+            <h2>Reset citizen password</h2>
+            <p>Set a new password for a citizen account without removing its reports.</p>
+            <form method="post" action="{{ url_for('reset_citizen_password') }}" autocomplete="off">
+                <label for="reset-email">Citizen email</label>
+                <input type="email" id="reset-email" name="email" autocomplete="off" required>
+                <label for="new-password">New password</label>
+                <input type="password" id="new-password" name="new_password" autocomplete="new-password" minlength="8" required>
+                <label for="confirm-password">Confirm new password</label>
+                <input type="password" id="confirm-password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+                <button type="submit">Reset citizen password</button>
+            </form>
+        </section>
     </main>
 </body>
 </html>
