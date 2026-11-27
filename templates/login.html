@@ -21,19 +21,19 @@
         <h2>Sign In</h2>
         <p>Use the full name or email address you registered with and your password. Your dashboard will open automatically.</p>
 
-        {% with messages = get_flashed_messages() %}
-            {% for message in messages %}
-                <div class="message">{{ message }}</div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="message {{ category }}">{{ message }}</div>
             {% endfor %}
         {% endwith %}
 
         <form method="POST" autocomplete="off">
             <label for="username">Username or email</label>
-            <input type="text" id="username" name="username" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" required>
+            <input type="text" id="username" name="username" class="{% if login_error %}is-invalid{% endif %}" value="{{ submitted_username|default('', true) }}" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" required>
 
             <label for="password">Password</label>
             <div class="password-field">
-                <input type="password" id="password" name="password" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" required>
+                <input type="password" id="password" name="password" class="{% if login_error %}is-invalid{% endif %}" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" required>
                 <button class="password-toggle" type="button" aria-controls="password" aria-pressed="false">Show</button>
             </div>
 

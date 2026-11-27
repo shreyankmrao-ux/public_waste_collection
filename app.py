@@ -435,7 +435,8 @@ def login():
                     url_for("dashboard")
                 )
 
-        flash("Invalid email or password.")
+        flash("Invalid email or password.", "error")
+        return render_template("login.html", login_error=True, submitted_username=username)
 
     return render_template("login.html")
 
