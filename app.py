@@ -71,6 +71,19 @@ def get_db():
     return conn
 
 
+@app.template_filter("local_datetime")
+def local_datetime(value):
+    if not value:
+        return "—"
+
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return str(value)
+
+    return parsed.strftime("%b %d, %Y %I:%M %p")
+
+
 def save_uploaded_image(upload):
 
     if not upload or not upload.filename:
