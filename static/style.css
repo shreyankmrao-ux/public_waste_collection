@@ -218,6 +218,12 @@ tbody tr:hover { background: #fbfdfb; }
 form { width: 100%; }
 label { display: block; margin: 12px 0 6px; color: var(--ink); font-weight: 700; }
 input, textarea, select { display: block; width: 100%; min-width: 0; margin: 6px 0 15px; padding: 11px 13px; border: 1px solid #cbd8ce; border-radius: 8px; background: #fff; color: var(--ink); font: inherit; }
+.password-field { position: relative; }
+.password-field input { padding-right: 48px; }
+.password-toggle { position: absolute; top: 50%; right: 10px; display: grid; width: 34px; height: 34px; place-items: center; margin: 0; padding: 5px; transform: translateY(-50%); border: 0; border-radius: 6px; background: transparent; color: var(--green); cursor: pointer; }
+.password-toggle:hover { background: #e8f4ea; color: var(--green-deep); }
+.password-toggle:focus-visible { outline: 2px solid #9ac8a5; outline-offset: 1px; }
+.password-toggle svg { display: block; width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 textarea { min-height: 130px; resize: vertical; }
 input[type="file"] { padding: 9px; }
 input:focus, textarea:focus, select:focus { outline: 2px solid #9ac8a5; outline-offset: 1px; border-color: var(--green); }
@@ -226,10 +232,7 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #9ac8a5; outline-
 .auth-page h2 { margin-bottom: 22px; color: var(--green); text-align: center; font-size: 30px; }
 .auth-page label { margin-top: 12px; }
 .auth-page input, .auth-page select { padding: 12px 14px; }
-.auth-page .password-field { position: relative; }
-.auth-page .password-field input { padding-right: 76px; }
-.auth-page .password-toggle { position: absolute; top: 50%; right: 10px; width: auto; margin: 0; padding: 5px 8px; transform: translateY(-50%); border: 0; background: transparent; color: var(--green); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
-.auth-page .password-toggle:hover { color: var(--green-deep); }
+.auth-page .password-field input { padding-right: 52px; }
 .auth-page form button { width: 100%; margin-top: 8px; }
 .auth-page > .container.small > .eyebrow { display: block; text-align: center; }
 .auth-switch { margin: 22px 0 0; color: #37483c; text-align: center; }

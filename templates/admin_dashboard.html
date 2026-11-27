@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin | CleanCity</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='admin-table-layout') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='admin-table-layout-password-eye') }}">
 </head>
 <body>
     <header class="topbar">
@@ -112,12 +112,19 @@
                 <label for="reset-email">Citizen email</label>
                 <input type="email" id="reset-email" name="email" autocomplete="off" required>
                 <label for="new-password">New password</label>
-                <input type="password" id="new-password" name="new_password" autocomplete="new-password" minlength="8" required>
+                <div class="password-field">
+                    <input type="password" id="new-password" name="new_password" autocomplete="new-password" minlength="8" required>
+                    <button class="password-toggle" type="button" aria-controls="new-password" aria-pressed="false"></button>
+                </div>
                 <label for="confirm-password">Confirm new password</label>
-                <input type="password" id="confirm-password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+                <div class="password-field">
+                    <input type="password" id="confirm-password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+                    <button class="password-toggle" type="button" aria-controls="confirm-password" aria-pressed="false"></button>
+                </div>
                 <button type="submit">Reset citizen password</button>
             </form>
         </section>
     </main>
+    <script src="{{ url_for('static', filename='script.js', v='password-eye') }}"></script>
 </body>
 </html>
