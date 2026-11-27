@@ -234,6 +234,7 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #9ac8a5; outline-
 .auth-page input, .auth-page select { padding: 12px 14px; }
 .auth-page .password-field input { padding-right: 52px; }
 .auth-page form button { width: 100%; margin-top: 8px; }
+.auth-page form .password-toggle { width: 34px; margin: 0; }
 .auth-page > .container.small > .eyebrow { display: block; text-align: center; }
 .auth-switch { margin: 22px 0 0; color: #37483c; text-align: center; }
 .auth-switch a { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; margin-top: 8px; padding: 8px 18px; border: 1px solid var(--green); border-radius: 8px; background: var(--green); color: white; font-weight: 700; text-decoration: none; }
