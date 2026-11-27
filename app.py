@@ -356,7 +356,8 @@ def login():
 
     if request.method == "POST":
 
-        email = request.form["email"].strip().lower()
+        username = request.form.get("username", request.form.get("email", "")).strip()
+        login_value = username.lower()
         password = request.form["password"]
 
         conn = get_db()
@@ -366,8 +367,17 @@ def login():
             FROM users
             WHERE lower(email) = ?
         """, (
-            email,
+            login_value,
         )).fetchone()
+
+        if user is None:
+            user = conn.execute("""
+                SELECT *
+                FROM users
+                WHERE lower(name) = ?
+                ORDER BY id
+                LIMIT 1
+            """, (login_value,)).fetchone()
 
         conn.close()
 
