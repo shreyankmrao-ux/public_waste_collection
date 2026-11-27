@@ -3,7 +3,7 @@ services:
     name: public-waste-collection-monitoring-system
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn wsgi:app
     disk:
       name: public-waste-collection-data
       mountPath: /var/data
@@ -13,10 +13,14 @@ services:
         generateValue: true
       - key: DATA_DIR
         value: /var/data
-      - key: DATABASE_PATH
+      - key: LEGACY_DATABASE_PATH
         value: /var/data/database.db
       - key: UPLOAD_FOLDER
         value: /var/data/uploads
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DATABASE
+        value: public_waste_collection
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USE_SSL
