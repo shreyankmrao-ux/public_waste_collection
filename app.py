@@ -17,7 +17,7 @@ import re
 import secrets
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import click
 from pymongo import MongoClient, ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -175,11 +175,27 @@ def local_datetime(value):
         return "—"
 
     try:
-        parsed = datetime.fromisoformat(str(value))
+        if isinstance(value, datetime):
+            parsed = value
+        else:
+            iso_value = str(value).strip()
+            if iso_value.endswith("Z"):
+                iso_value = iso_value[:-1] + "+00:00"
+            parsed = datetime.fromisoformat(iso_value)
     except (TypeError, ValueError):
         return str(value)
 
-    return parsed.strftime("%b %d, %Y %I:%M %p")
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+
+    india_timezone = timezone(timedelta(hours=5, minutes=30))
+    return parsed.astimezone(india_timezone).strftime(
+        "%b %d, %Y %I:%M %p"
+    )
+
+
+def utc_now_string():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def save_uploaded_image(upload):
@@ -575,7 +591,7 @@ def report():
             "description": description,
             "photo": filename,
             "status": "Pending",
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "created_at": utc_now_string(),
             "assigned_to": None,
             "assigned_category": None,
             "completed_at": None,
@@ -898,7 +914,7 @@ def update_status(report_id):
         return redirect(url_for("personnel_dashboard"))
 
     completed_at = (
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        utc_now_string()
         if requested_status == "Completed"
         else None
     )

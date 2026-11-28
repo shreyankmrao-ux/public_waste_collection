@@ -15,6 +15,12 @@ PNG_BYTES = b"\x89PNG\r\n\x1a\ntest-image"
 
 
 class MongoPersistenceTests(unittest.TestCase):
+    def test_local_datetime_converts_utc_to_ist(self):
+        self.assertEqual(
+            application.local_datetime("2026-11-28 02:36:00"),
+            "Nov 28, 2026 08:06 AM"
+        )
+
     def setUp(self):
         self.original_client = application._mongo_client
         self.original_uri = application.MONGODB_URI
