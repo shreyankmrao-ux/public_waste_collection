@@ -8,6 +8,7 @@ from flask import (
     url_for,
     session,
     flash,
+    send_file,
     send_from_directory,
 )
 from werkzeug.exceptions import NotFound
@@ -15,10 +16,14 @@ import sqlite3
 import os
 import re
 import secrets
+import io
+import mimetypes
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime, timedelta, timezone
 import click
+from gridfs import GridFS
+from gridfs.errors import NoFile
 from pymongo import MongoClient, ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from dotenv import load_dotenv
@@ -215,8 +220,54 @@ def save_uploaded_image(upload):
         raise ValueError("The uploaded file is not a valid JPG, JPEG, or PNG image.")
 
     filename = secure_filename(f"{secrets.token_hex(16)}{extension}")
-    upload.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+    GridFS(get_db()).put(
+        upload.stream,
+        filename=filename,
+        contentType=mimetypes.guess_type(filename)[0],
+    )
     return filename
+
+
+def migrate_uploaded_images(database):
+    gridfs = GridFS(database)
+    referenced_filenames = set()
+    for report in database.reports.find(
+        {},
+        {"photo": 1, "after_photo": 1}
+    ):
+        referenced_filenames.update(
+            filename
+            for filename in (report.get("photo"), report.get("after_photo"))
+            if filename
+        )
+
+    existing_filenames = {
+        image.filename
+        for image in gridfs.find({
+            "filename": {"$in": list(referenced_filenames)}
+        })
+    }
+    legacy_directories = (
+        app.config["UPLOAD_FOLDER"],
+        os.path.join(PROJECT_DIR, "static", "uploads"),
+    )
+    for filename in referenced_filenames:
+        if (
+            filename in existing_filenames
+            or os.path.basename(filename) != filename
+        ):
+            continue
+        for directory in legacy_directories:
+            path = os.path.join(directory, filename)
+            if not os.path.isfile(path):
+                continue
+            with open(path, "rb") as image_file:
+                gridfs.put(
+                    image_file,
+                    filename=filename,
+                    contentType=mimetypes.guess_type(filename)[0],
+                )
+            break
 
 
 # =========================================================
@@ -227,6 +278,7 @@ def init_db():
     database = get_db()
     database.client.admin.command("ping")
     migrate_legacy_sqlite(database)
+    migrate_uploaded_images(database)
 
     database.users.create_index("id", unique=True)
     database.users.create_index("email_normalized", unique=True)
@@ -348,6 +400,21 @@ def index():
 
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
+    try:
+        image = GridFS(get_db()).get_last_version(filename)
+    except NoFile:
+        image = None
+
+    if image:
+        return send_file(
+            io.BytesIO(image.read()),
+            mimetype=(
+                mimetypes.guess_type(filename)[0]
+                or "application/octet-stream"
+            ),
+            download_name=filename,
+        )
+
     try:
         return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
     except NotFound:

@@ -6,9 +6,13 @@ import unittest
 from unittest.mock import Mock, patch
 
 import mongomock
+import mongomock.gridfs
+from gridfs import GridFS
 
 import app as application
 
+
+mongomock.gridfs.enable_gridfs_integration()
 
 JPEG_BYTES = b"\xff\xd8\xff\xe0test-image"
 PNG_BYTES = b"\x89PNG\r\n\x1a\ntest-image"
@@ -186,11 +190,54 @@ class MongoPersistenceTests(unittest.TestCase):
         self.assertEqual(updated["status"], "Completed")
         self.assertEqual(updated["verification_status"], "Verified by Admin")
         self.assertTrue(updated["after_photo"])
+        self.assertEqual(
+            self.client.get(
+                "/uploads/{}".format(report["photo"])
+            ).data,
+            JPEG_BYTES
+        )
+        self.assertEqual(
+            self.client.get(
+                "/uploads/{}".format(updated["after_photo"])
+            ).data,
+            PNG_BYTES
+        )
         admin_dashboard = self.client.get("/admin")
         self.assertNotIn(
             "/assign/{}".format(report["id"]).encode(),
             admin_dashboard.data
         )
+
+    def test_existing_report_images_are_migrated_to_mongodb(self):
+        before_filename = "legacy-before.jpg"
+        after_filename = "legacy-after.png"
+        with open(os.path.join(self.upload_path, before_filename), "wb") as image_file:
+            image_file.write(JPEG_BYTES)
+        with open(os.path.join(self.upload_path, after_filename), "wb") as image_file:
+            image_file.write(PNG_BYTES)
+        self.database.reports.insert_one(
+            application.prepare_document("reports", {
+                "user_id": self.citizen_id,
+                "photo": before_filename,
+                "after_photo": after_filename,
+            })
+        )
+
+        application.migrate_uploaded_images(self.database)
+        os.remove(os.path.join(self.upload_path, before_filename))
+        os.remove(os.path.join(self.upload_path, after_filename))
+
+        self.assertEqual(
+            self.client.get("/uploads/{}".format(before_filename)).data,
+            JPEG_BYTES
+        )
+        self.assertEqual(
+            self.client.get("/uploads/{}".format(after_filename)).data,
+            PNG_BYTES
+        )
+        self.assertTrue(GridFS(self.database).exists(
+            {"filename": before_filename}
+        ))
 
     def test_staff_cannot_complete_without_photo_or_update_another_staff_report(self):
         report_id = self.create_assigned_report()

@@ -14,9 +14,11 @@ is `database.db`; Render is configured to read `/var/data/database.db`.
 Imported IDs and report/user relationships are preserved. A migration marker
 prevents the SQLite file from being re-imported on later restarts.
 
-The existing Render disk remains mounted for uploaded photos and as the source
-for this one-time SQLite import. It is not used for ongoing database reads or
-writes.
+Report photos are stored in MongoDB GridFS so they remain available across
+application restarts and deployments. On startup, photos referenced by reports
+are copied from the upload directory or `static/uploads` into GridFS when a
+local copy still exists. The Render disk remains mounted as a source for the
+one-time SQLite import and for migrating older uploaded photos.
 
 For local development, set `MONGODB_URI` before running the app, for example
 with a local MongoDB instance or an Atlas cluster. Do not commit the URI or
